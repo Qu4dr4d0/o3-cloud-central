@@ -1,0 +1,40 @@
+name: Verify Ubuntu installer
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ubuntu:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Get the published source
+        env:
+          REPOSITORY: ${{ github.repository }}
+          REF: ${{ github.ref_name }}
+        run: git clone --depth 1 --branch "$REF" "https://github.com/$REPOSITORY.git" source
+      - name: Install the release on a fresh Ubuntu runner
+        run: sudo sh source/install.sh --url https://central.example.com:8443
+      - name: Verify bootstrap credentials and mandatory change
+        run: sudo /opt/o3cloudcentral/venv/bin/python source/scripts/verify-installed.py
+      - name: Install again and preserve the password
+        run: |
+          sudo sh source/install.sh --url https://central.example.com:8443 --upgrade
+          sudo /opt/o3cloudcentral/venv/bin/python - <<'PY'
+          import json, ssl, urllib.request
+          context=ssl.create_default_context(cafile='/etc/o3cloudcentral/ca.crt')
+          req=urllib.request.Request('https://localhost:8443/api/auth/login',
+              data=json.dumps({'username':'admin','password':'temporary-test-password-123'}).encode(),
+              headers={'Content-Type':'application/json','X-EdgeHub-Request':'1'})
+          with urllib.request.urlopen(req,context=context) as response:
+              assert not json.load(response)['must_change_password']
+          print('Upgrade preserved credentials: OK')
+          PY
+      - name: Python tests with a separate disposable SQL database
+        run: |
+          sudo mariadb -e "CREATE DATABASE edgehub_test_ci;"
+          sudo /opt/o3cloudcentral/venv/bin/python -m pip install pytest pytest-asyncio pytest-subtests
+          sudo env PYTHONPATH="$PWD/source/python" EDGEHUB_TEST_DSN="mysql+pymysql://root@localhost/edgehub_test_ci?unix_socket=/run/mysqld/mysqld.sock" /opt/o3cloudcentral/venv/bin/python -m pytest source/python/tests -q
+      - name: Service diagnostics on failure
+        if: failure()
+        run: sudo journalctl -u o3cloudcentral -n 100 --no-pager

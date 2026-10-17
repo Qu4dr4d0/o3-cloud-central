@@ -1,0 +1,24 @@
+[Unit]
+Description=O3 Cloud Central
+After=network-online.target mariadb.service
+Wants=network-online.target
+Requires=mariadb.service
+
+[Service]
+User=edgehub
+Group=edgehub
+WorkingDirectory=/var/lib/edgehub
+EnvironmentFile=/etc/o3cloudcentral.env
+ExecStart=/opt/o3cloudcentral/venv/bin/python -B -m edgehub central --dir /var/lib/edgehub --listen :8443 --internal-only=false
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/edgehub
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
+Alias=edgehub.service

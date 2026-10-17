@@ -1,0 +1,29 @@
+# Managed by O3 Cloud Central terminal installer
+[Unit]
+Description=O3 Cloud Central - agente do terminal
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/var/lib/o3cloudcentral-agent/config.json
+
+[Service]
+Type=simple
+User=_o3cloudagent
+Group=_o3cloudagent
+ExecStart=/opt/o3cloudcentral-agent/deploy/run.sh
+WorkingDirectory=/var/lib/o3cloudcentral-agent
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/o3cloudcentral-agent
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+LockPersonality=yes
+RestrictSUIDSGID=yes
+
+[Install]
+WantedBy=multi-user.target

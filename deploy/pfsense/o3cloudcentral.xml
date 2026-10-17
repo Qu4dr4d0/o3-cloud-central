@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<packagegui>
+  <name>O3CloudCentral</name>
+  <title>Services: O3 Cloud Central</title>
+  <include_file>/usr/local/pkg/o3cloudcentral.inc</include_file>
+  <menu>
+    <name>O3 Cloud Central</name>
+    <section>Services</section>
+    <url>/o3cloudcentral_status.php</url>
+    <tooltiptext>Estado e controle do agente O3 Cloud Central</tooltiptext>
+  </menu>
+  <service>
+    <name>o3cloudcentral</name>
+    <description>O3 Cloud Central</description>
+    <startcmd><![CDATA[(function () { require_once('/usr/local/pkg/o3cloudcentral.inc'); return o3c_service_start(); })();]]></startcmd>
+    <stopcmd><![CDATA[(function () { require_once('/usr/local/pkg/o3cloudcentral.inc'); return o3c_service_stop(); })();]]></stopcmd>
+    <custom_php_service_status_command><![CDATA[(function () { require_once('/usr/local/pkg/o3cloudcentral.inc'); return o3c_service_state() === 'running'; })()]]></custom_php_service_status_command>
+  </service>
+  <custom_php_resync_config_command>o3c_service_resync();</custom_php_resync_config_command>
+</packagegui>

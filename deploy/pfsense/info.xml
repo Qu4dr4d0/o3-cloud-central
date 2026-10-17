@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<pfsensepkgs>
+  <package>
+    <name>O3CloudCentral</name>
+    <descr>O3 Cloud Central — acesso aos serviços e telemetria dos terminais.</descr>
+    <version>%%PKGVERSION%%</version>
+    <configurationfile>o3cloudcentral.xml</configurationfile>
+  </package>
+</pfsensepkgs>

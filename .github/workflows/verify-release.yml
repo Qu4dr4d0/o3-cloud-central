@@ -1,6 +1,9 @@
 name: Verify Ubuntu installer
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.github/workflows/verify-release.yml]
 permissions:
   contents: read
 jobs:

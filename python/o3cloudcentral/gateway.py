@@ -30,8 +30,8 @@ from .central_tls import select_tls_context
 from . import __version__ as VERSION
 
 LOG = logging.getLogger(__name__)
-POLICY_REQUEST = "policy-v1@edgehub"
-IDENTITY_REQUEST = "identity-v1@edgehub"
+POLICY_REQUEST = "policy-v1@o3cloudcentral"
+IDENTITY_REQUEST = "identity-v1@o3cloudcentral"
 CONNECTION_LIMIT, CLASSIFICATION_LIMIT, TLS_LIMIT = 288, 32, 32
 
 
@@ -392,7 +392,7 @@ class GatewaySSH(asyncssh.SSHServer):
         # AsyncSSH 2.24.1's request dispatcher has no public extension hook.
         # Keep the two versioned hooks isolated and covered by Go interop tests.
         for name, handler in ((POLICY_REQUEST, self.policy_request), (IDENTITY_REQUEST, self.identity_request),
-                              ("keepalive@edgehub", self.keepalive_request)):
+                              ("keepalive@o3cloudcentral", self.keepalive_request)):
             setattr(connection, "_process_" + map_handler_name(name) + "_global_request", handler)
 
     def connection_lost(self, exc):

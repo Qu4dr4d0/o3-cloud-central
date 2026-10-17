@@ -89,7 +89,7 @@ def main():
                     if info.is_dir() or info.filename.endswith(('.pyc','.pyo')): continue
                     add('runtime/lib/python3.12/site-packages/'+safe_name(info.filename),wheel.read(info))
             print(name,version,flush=True)
-        for source in sorted((ROOT/'python/edgehub').glob('*.py')): add('app/edgehub/'+source.name,source.read_bytes())
+        for source in sorted((ROOT/'python/o3cloudcentral').glob('*.py')): add('app/o3cloudcentral/'+source.name,source.read_bytes())
         for name in ('install.sh','run.sh','control.sh','uninstall.sh','o3cloudcentral-agent.service'):
             add('deploy/'+name,(ROOT/'deploy/linux'/name).read_bytes(),0o755 if name.endswith('.sh') else 0o644)
         add('THIRD_PARTY_NOTICES.txt',(ROOT/'THIRD_PARTY_NOTICES.txt').read_bytes())

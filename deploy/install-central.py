@@ -18,9 +18,9 @@ from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = Path("/opt/o3cloudcentral")
-DATA = Path("/var/lib/edgehub")
+DATA = Path("/var/lib/o3cloudcentral")
 MARKER = Path("/etc/o3cloudcentral-install.json")
-DSN = "mysql+pymysql://edgehub@localhost/edgehub_python?unix_socket=/run/mysqld/mysqld.sock"
+DSN = "mysql+pymysql://o3cloudcentral@localhost/o3cloudcentral?unix_socket=/run/mysqld/mysqld.sock"
 
 def run(args, **kw):
     return subprocess.run(args, check=True, **kw)
@@ -77,6 +77,8 @@ def main():
     if previous:
         if previous.get("product") != "o3-cloud-central" or previous.get("url") != url:
             raise ValueError("Instalação ou URL diferente. Migração exige procedimento explícito; nada foi alterado.")
+        if previous.get("ready") and "O3CLOUDCENTRAL_DATABASE_URL=" not in Path("/etc/o3cloudcentral.env").read_text():
+            raise ValueError("Esta instalação utiliza nomes anteriores. Execute deploy/migrate-central.py ou faça uma instalação limpa em outra VM.")
         if previous.get("ready") and not args.upgrade:
             print("Central já instalada. Para atualizar preservando os dados, use --upgrade.")
             return
@@ -84,35 +86,35 @@ def main():
         if BASE.exists() or DATA.exists() or Path("/etc/o3cloudcentral.env").exists():
             raise ValueError("Instalação existente sem identificação deste instalador; nada foi alterado.")
         try:
-            pwd.getpwnam("edgehub")
+            pwd.getpwnam("o3cloudcentral")
         except KeyError:
             pass
         else:
-            raise ValueError("Usuário edgehub já existe; não será reutilizado automaticamente.")
+            raise ValueError("Usuário o3cloudcentral já existe; não será reutilizado automaticamente.")
     environment = dict(os.environ, DEBIAN_FRONTEND="noninteractive")
     run(["apt-get", "update"], env=environment)
     run(["apt-get", "install", "-y", "python3", "python3-venv", "mariadb-server", "ca-certificates", "curl"], env=environment)
     run(["service", "mariadb", "start"] if args.prepare_only else ["systemctl", "enable", "--now", "mariadb"])
     if previous is None:
-        exists = sql("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='edgehub_python';")
-        account = sql("SELECT User FROM mysql.user WHERE User='edgehub';")
+        exists = sql("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='o3cloudcentral';")
+        account = sql("SELECT User FROM mysql.user WHERE User='o3cloudcentral';")
         if exists or account:
-            raise ValueError("Banco ou usuário SQL edgehub existente. Instalação cancelada para preservar os dados.")
+            raise ValueError("Banco ou usuário SQL o3cloudcentral existente. Instalação cancelada para preservar os dados.")
         previous = {"product": "o3-cloud-central", "url": url, "ready": False, "database_ready": False}
         write(MARKER, json.dumps(previous))
     try:
-        pwd.getpwnam("edgehub")
+        pwd.getpwnam("o3cloudcentral")
     except KeyError:
-        run(["useradd", "--system", "--home-dir", str(DATA), "--shell", "/usr/sbin/nologin", "edgehub"])
-    account = pwd.getpwnam("edgehub")
+        run(["useradd", "--system", "--home-dir", str(DATA), "--shell", "/usr/sbin/nologin", "o3cloudcentral"])
+    account = pwd.getpwnam("o3cloudcentral")
     DATA.mkdir(mode=0o700, exist_ok=True)
     os.chown(DATA, account.pw_uid, account.pw_gid)
     os.chmod(DATA, 0o700)
     if not previous.get("database_ready"):
         # Only a marked partial installation reaches this branch. No DROP or reset.
-        sql("CREATE DATABASE IF NOT EXISTS edgehub_python CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;"
-            "CREATE USER IF NOT EXISTS 'edgehub'@'localhost' IDENTIFIED VIA unix_socket;"
-            "GRANT ALL PRIVILEGES ON edgehub_python.* TO 'edgehub'@'localhost';")
+        sql("CREATE DATABASE IF NOT EXISTS o3cloudcentral CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;"
+            "CREATE USER IF NOT EXISTS 'o3cloudcentral'@'localhost' IDENTIFIED VIA unix_socket;"
+            "GRANT ALL PRIVILEGES ON o3cloudcentral.* TO 'o3cloudcentral'@'localhost';")
         previous["database_ready"] = True
         write(MARKER, json.dumps(previous))
     release_id = manifest["version"] + "-" + str(time.time_ns())
@@ -133,12 +135,12 @@ def main():
     run([python, "-m", "pip", "install", "--require-hashes", "--only-binary=:all:", "--no-deps",
          "-r", str(release / "requirements-central.lock")], env=pip_env)
     run([python, "-m", "pip", "check"], env=pip_env)
-    child_env = dict(pip_env, PYTHONPATH=str(release / "python"), EDGEHUB_DATABASE_URL=DSN)
+    child_env = dict(pip_env, PYTHONPATH=str(release / "python"), O3CLOUDCENTRAL_DATABASE_URL=DSN)
     if not previous.get("ready"):
         # Do not overwrite PKI left by an interrupted initialization.
         if (DATA / "ca.key").exists():
             raise ValueError("Inicialização interrompida deixou PKI. Dados preservados; consulte deploy/INSTALL.md antes de continuar.")
-        run(["runuser", "-u", "edgehub", "--", python, "-B", "-m", "edgehub", "init-central",
+        run(["runuser", "-u", "o3cloudcentral", "--", python, "-B", "-m", "o3cloudcentral", "init-central",
              "--dir", str(DATA), "--url", url, "--names", host + ",localhost,127.0.0.1"], env=child_env)
         previous["ready"] = True
         write(MARKER, json.dumps(previous))
@@ -157,7 +159,7 @@ def main():
     old_unit = unit_path.read_text() if unit_path.exists() else None
     link(BASE / "current", release)
     link(BASE / "venv", venv)
-    write(env_path, "PYTHONPATH=/opt/o3cloudcentral/current/python\nEDGEHUB_RESOURCE_ROOT=/opt/o3cloudcentral/current\nEDGEHUB_DATABASE_URL=" + DSN + "\n", 0o640)
+    write(env_path, "PYTHONPATH=/opt/o3cloudcentral/current/python\nO3CLOUDCENTRAL_RESOURCE_ROOT=/opt/o3cloudcentral/current\nO3CLOUDCENTRAL_DATABASE_URL=" + DSN + "\n", 0o640)
     os.chown(env_path, 0, account.pw_gid)
     unit = (release / "deploy/o3cloudcentral.service").read_text().replace("--listen :8443", "--listen :" + str(port))
     write(unit_path, unit, 0o644)

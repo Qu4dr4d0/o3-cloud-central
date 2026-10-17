@@ -8,7 +8,7 @@ import threading
 import time
 from pathlib import Path
 
-from .windows_branding import PIPE_NAME, SERVICE_NAME, LEGACY_NAME, PRODUCT_NAME
+from .windows_branding import PIPE_NAME, SERVICE_NAME, PRODUCT_NAME
 
 PIPE_SDDL = "D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x100183;;;IU)S:(ML;;NW;;;ME)"
 ALLOWED_COMMANDS = {"status", "log", "connect", "disconnect", "reconnect"}
@@ -135,8 +135,7 @@ def trusted_service_pipe(handle, *, server_pid=None, service_pid=None):
             except pywintypes.error as exc:
                 if exc.winerror != 1060:
                     raise
-                # The new tray can control an older install before an upgrade.
-                service = win32service.OpenService(manager, LEGACY_NAME, win32service.SERVICE_QUERY_STATUS)
+                raise PermissionError("O serviço O3 Cloud Central não está instalado.") from exc
             try:
                 service_pid = win32service.QueryServiceStatusEx(service)["ProcessId"]
             finally:

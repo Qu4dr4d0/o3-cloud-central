@@ -8,7 +8,7 @@
 *.sql
 *.pkg
 *.exe
-*.edgehub
+*.o3cloudcentral
 config.json
 state.json
 admin-password.txt

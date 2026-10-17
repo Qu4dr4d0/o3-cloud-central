@@ -1,0 +1,1 @@
+/var/log/o3cloudcentral.log _o3cloudcentral:_o3cloudcentral 600 5 1024 * JC /var/run/o3cloudcentral-supervisor.pid

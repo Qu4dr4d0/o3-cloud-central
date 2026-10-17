@@ -26,7 +26,7 @@ from asyncssh.constants import MSG_REQUEST_SUCCESS
 try:
     from . import __version__
 except ImportError:
-    __version__ = "0.6.6"
+    __version__ = "0.7.0"
 
 LOG = logging.getLogger(__name__)
 MAX_POLICY = 128 << 10
@@ -134,7 +134,7 @@ async def global_request(connection, name: str, data: bytes = b"", timeout=REQUE
 
 
 async def gateway_policy(connection, pinned_key: str) -> dict:
-    accepted, raw = await global_request(connection, "policy-v1@edgehub", timeout=10)
+    accepted, raw = await global_request(connection, "policy-v1@o3cloudcentral", timeout=10)
     if not accepted:
         raise ConnectionError("pfSense não oferece controle do terminal; atualize o firewall")
     if len(raw) > MAX_POLICY:
@@ -193,9 +193,9 @@ async def _heartbeat(connection):
         if supported:
             payload = json.dumps(collect_identity(connection.get_extra_info("sockname")), separators=(",", ":")).encode()
             if len(payload) <= 1024:
-                supported, _ = await global_request(connection, "identity-v1@edgehub", payload)
+                supported, _ = await global_request(connection, "identity-v1@o3cloudcentral", payload)
         await asyncio.sleep(IDENTITY_INTERVAL)
-        accepted, _ = await global_request(connection, "keepalive@edgehub")
+        accepted, _ = await global_request(connection, "keepalive@o3cloudcentral")
         if not accepted:
             raise ConnectionError("keepalive recusado pelo pfSense")
 

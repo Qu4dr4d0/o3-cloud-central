@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--python", type=Path, default=ROOT.parent / ".edgehub-python" / "Scripts" / "python.exe")
+    parser.add_argument("--python", type=Path, default=ROOT.parent / ".o3cloudcentral-python" / "Scripts" / "python.exe")
     arguments = parser.parse_args()
     if os.name != "nt":
         parser.error("Execute o empacotamento Windows em um host Windows.")
@@ -24,12 +24,12 @@ def main():
     work.mkdir(parents=True, exist_ok=True)
     version_file = work / "windows-version.txt"
     version_file.write_text("""VSVersionInfo(
-  ffi=FixedFileInfo(filevers=(0,6,6,0), prodvers=(0,6,6,0), mask=0x3f, flags=0x0, OS=0x40004, fileType=0x1, subtype=0x0, date=(0,0)),
+  ffi=FixedFileInfo(filevers=(0,7,0,0), prodvers=(0,7,0,0), mask=0x3f, flags=0x0, OS=0x40004, fileType=0x1, subtype=0x0, date=(0,0)),
   kids=[StringFileInfo([StringTable('041604B0', [
     StringStruct('CompanyName','O3 Cloud'), StringStruct('FileDescription','O3 Cloud Central'),
-    StringStruct('FileVersion','0.6.6.0'), StringStruct('InternalName','O3CloudCentral'),
+    StringStruct('FileVersion','0.7.0.0'), StringStruct('InternalName','O3CloudCentral'),
     StringStruct('OriginalFilename','O3CloudCentral.exe'), StringStruct('ProductName','O3 Cloud Central'),
-    StringStruct('ProductVersion','0.6.6')])]),
+    StringStruct('ProductVersion','0.7.0')])]),
     VarFileInfo([VarStruct('Translation',[1046,1200])])])
 """, encoding="utf-8")
     manifest = work / "O3CloudCentral.manifest"
@@ -47,12 +47,12 @@ def main():
         "--add-data", str(ROOT / "web") + os.pathsep + "web", "--add-data", str(ROOT / "assets") + os.pathsep + "assets"]
     for module in hidden:
         command.extend(["--hidden-import", module])
-    command.append(str(ROOT / "python" / "edgehub" / "__main__.py"))
+    command.append(str(ROOT / "python" / "o3cloudcentral" / "__main__.py"))
     subprocess.run(command, cwd=ROOT, check=True)
     executable = output / "O3CloudCentral.exe"
     if not executable.is_file() or not 0 < executable.stat().st_size <= 128 << 20:
         raise RuntimeError("Executável fora do limite de distribuição.")
-    summary = {"name": "O3 Cloud Central", "file": executable.name, "version": "0.6.6", "language": "Python", "bytes": executable.stat().st_size,
+    summary = {"name": "O3 Cloud Central", "file": executable.name, "version": "0.7.0", "language": "Python", "bytes": executable.stat().st_size,
         "sha256": hashlib.file_digest(executable.open("rb"), "sha256").hexdigest()}
     (output / "windows-build.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(summary))

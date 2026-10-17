@@ -16,7 +16,7 @@ import sys
 
 import pytest
 
-from edgehub.central_artifacts import PFSENSE_OWNED_PATHS, pfsense_command
+from o3cloudcentral.central_artifacts import PFSENSE_OWNED_PATHS, pfsense_command
 
 
 def command_script() -> str:
@@ -29,18 +29,18 @@ def test_update_script_covers_runtime_config_registry_and_order():
     script = command_script()
     for path in PFSENSE_OWNED_PATHS:
         assert path in script
-    assert 'cp -p /usr/local/etc/edgehub/config.json "$edge_backup/config.json"' in script
+    assert 'cp -p /usr/local/etc/o3cloudcentral/config.json "$edge_backup/config.json"' in script
     assert 'pkg create -o "$edge_backup/package" "$edge_previous_name"' in script
     assert 'tar -xpf "$edge_backup/owned.tar" -C /' in script
     assert 'pkg add -f "$edge_previous_pkg"' in script
-    assert "rm -rf -- /usr/local/libexec/edgehub" in script
-    assert "/var/db/edgehub" not in script
+    assert "rm -rf -- /usr/local/libexec/o3cloudcentral" in script
+    assert "/var/db/o3cloudcentral" not in script
     assert script.index('fetch --ca-cert=') < script.index('edge_backup=$(mktemp')
     assert script.index('edge_dirty=1') < script.index('pkg add -f "$edge_tmp/package.pkg"')
     assert script.index('pkg add -f "$edge_tmp/package.pkg"') < script.index('/usr/local/sbin/o3cloudcentral configure-gateway')
     assert script.index('/usr/local/sbin/o3cloudcentral configure-gateway') < script.index('edge_committed=1')
     assert 'mkdir -m 700 "$edge_lock"' in script
-    assert 'pkg set -y -n pfSense-pkg-EdgeHub:pfSense-pkg-O3CloudCentral pfSense-pkg-EdgeHub' in script
+    assert 'pkg set -y -n pfSense-pkg-O3CloudCentral:pfSense-pkg-O3CloudCentral' not in script
     assert script.index('! edge_pidfiles_safe stopped') < script.index('if [ -n "$edge_previous_pkg" ]; then')
 
 
@@ -66,10 +66,10 @@ registered = root / 'registered'
 with (root / 'pkg-actions.jsonl').open('a') as log:
     log.write(json.dumps(args) + '\n')
 if args[0] == 'info':
-    name = 'pfSense-pkg-O3CloudCentral' if registered.exists() and registered.read_text() in ('new-package', 'renamed-old-package') else 'pfSense-pkg-EdgeHub'
+    name = 'pfSense-pkg-O3CloudCentral' if registered.exists() and registered.read_text() in ('new-package', 'renamed-old-package') else 'pfSense-pkg-O3CloudCentral'
     raise SystemExit(0 if registered.exists() and args[-1] == name else 1)
 if args[0] == 'set':
-    registered.write_text('renamed-old-package' if args[-1] == 'pfSense-pkg-EdgeHub' else 'old-package')
+    registered.write_text('renamed-old-package' if args[-1] == 'pfSense-pkg-O3CloudCentral' else 'old-package')
     raise SystemExit(0)
 if args[0] == 'annotate':
     raise SystemExit(0)
@@ -91,24 +91,24 @@ if package.name == 'old.pkg':
     registered.write_text('old-package')
     raise SystemExit(0)
 registered.write_text('new-package')
-runtime = root / 'usr/local/libexec/edgehub'
+runtime = root / 'usr/local/libexec/o3cloudcentral'
 runtime.mkdir(parents=True, exist_ok=True)
 (runtime / 'native-python').write_text('new-runtime')
 (runtime / 'new-only-file').write_text('new-runtime-only-file')
-wrapper = root / 'usr/local/sbin/edgehub'
+wrapper = root / 'usr/local/sbin/o3cloudcentral'
 wrapper.write_text('#!/bin/sh\n' +
-    'if [ "$1" = configure-gateway ]; then printf "new-config" > "' + str(root / 'usr/local/etc/edgehub/config.json') + '"; [ "$FAKE_FAIL" != configure ] || exit 1; fi\nexit 0\n')
+    'if [ "$1" = configure-gateway ]; then printf "new-config" > "' + str(root / 'usr/local/etc/o3cloudcentral/config.json') + '"; [ "$FAKE_FAIL" != configure ] || exit 1; fi\nexit 0\n')
 wrapper.chmod(0o755)
 canonical = root / 'usr/local/sbin/o3cloudcentral'
 canonical.write_text(wrapper.read_text())
 canonical.chmod(0o755)
-rc = root / 'usr/local/etc/rc.d/edgehub.sh'
+rc = root / 'usr/local/etc/rc.d/o3cloudcentral.sh'
 rc.write_text((root / 'new-rc-template').read_text())
 rc.chmod(0o755)
 new_rc = root / 'usr/local/etc/rc.d/o3cloudcentral.sh'
 new_rc.write_text(rc.read_text())
 new_rc.chmod(0o755)
-policy = root / 'var/db/edgehub/policy.json'
+policy = root / 'var/db/o3cloudcentral/policy.json'
 policy.write_text('new-current-policy')
 if fail == 'pkg':
     raise SystemExit(1)
@@ -121,31 +121,31 @@ if fail == 'pkg':
 def test_update_rollback_against_fake_root(tmp_path, legacy_go, failure):
     root = tmp_path / "fake-root"
     root.mkdir()
-    for directory in ("var/run", "var/tmp", "tmp", "var/db/edgehub", "usr/local/libexec", "usr/local/etc/edgehub"):
+    for directory in ("var/run", "var/tmp", "tmp", "var/db/o3cloudcentral", "usr/local/libexec", "usr/local/etc/o3cloudcentral"):
         (root / directory).mkdir(parents=True, exist_ok=True)
-    wrapper = root / "usr/local/sbin/edgehub"
-    rc = root / "usr/local/etc/rc.d/edgehub.sh"
-    config = root / "usr/local/etc/edgehub/config.json"
-    runtime = root / "usr/local/libexec/edgehub"
+    wrapper = root / "usr/local/sbin/o3cloudcentral"
+    rc = root / "usr/local/etc/rc.d/o3cloudcentral.sh"
+    config = root / "usr/local/etc/o3cloudcentral/config.json"
+    runtime = root / "usr/local/libexec/o3cloudcentral"
     original_config = '{"private_key":"fixture-only-key","id":"fixture-gateway"}\n'
     _write(config, original_config)
-    _write(wrapper, "#!/bin/sh\n# Original EdgeHub wrapper\nexit 0\n", executable=True)
+    _write(wrapper, "#!/bin/sh\n# Original O3CloudCentral wrapper\nexit 0\n", executable=True)
     old_wrapper = wrapper.read_bytes()
     running = root / "running"
     running.touch()
     _write(root / "registered", "old-package")
-    _write(root / "var/db/edgehub/policy.json", "old-policy")
+    _write(root / "var/db/o3cloudcentral/policy.json", "old-policy")
     for owned in PFSENSE_OWNED_PATHS:
         if "o3cloudcentral" in owned:
             continue
-        if owned.endswith(("/edgehub", "/edgehub.sh")):
+        if owned.endswith(("/o3cloudcentral", "/o3cloudcentral.sh")):
             continue
         _write(root / owned, "original: " + owned)
     rc_common = 'case "$1" in\n status) test -f ' + shlex.quote(str(running)) + ';;\n stop) rm -f ' + shlex.quote(str(running)) + ';;\n start) touch ' + shlex.quote(str(running)) + ';;\n *) exit 2;;\nesac\n'
-    _write(rc, "#!/bin/sh\n# Original EdgeHub rc\n" + rc_common, executable=True)
+    _write(rc, "#!/bin/sh\n# Original O3CloudCentral rc\n" + rc_common, executable=True)
     old_rc = rc.read_bytes()
     new_rc = '#!/bin/sh\nif [ "$1" = start ] && [ "$FAKE_FAIL" = start ]; then exit 1; fi\nif [ "$1" = status ] && [ "$FAKE_FAIL" = status ]; then exit 1; fi\n'
-    new_rc += 'if [ "$1" = start ] && { [ "$FAKE_FAIL" = stopfail ] || [ "$FAKE_FAIL" = unknownpid ]; }; then touch ' + shlex.quote(str(running)) + '; if [ "$FAKE_FAIL" = unknownpid ]; then printf "%s" "$FAKE_UNKNOWN_PID" > ' + shlex.quote(str(root / "var/run/edgehub-supervisor.pid")) + '; fi; exit 1; fi\n'
+    new_rc += 'if [ "$1" = start ] && { [ "$FAKE_FAIL" = stopfail ] || [ "$FAKE_FAIL" = unknownpid ]; }; then touch ' + shlex.quote(str(running)) + '; if [ "$FAKE_FAIL" = unknownpid ]; then printf "%s" "$FAKE_UNKNOWN_PID" > ' + shlex.quote(str(root / "var/run/o3cloudcentral-supervisor.pid")) + '; fi; exit 1; fi\n'
     new_rc += 'if [ "$1" = stop ] && [ "$FAKE_FAIL" = stopfail ]; then exit 1; fi\n' + rc_common
     _write(root / "new-rc-template", new_rc)
     if not legacy_go:
@@ -164,7 +164,7 @@ def test_update_rollback_against_fake_root(tmp_path, legacy_go, failure):
     script = script.replace("/usr/local/", str(root / "usr/local") + "/")
     script = script.replace("/var/tmp/", str(root / "var/tmp") + "/")
     script = script.replace("/var/run/", str(root / "var/run") + "/")
-    script = script.replace("/tmp/edgehub-update.", str(root / "tmp/edgehub-update."))
+    script = script.replace("/tmp/o3cloudcentral-update.", str(root / "tmp/o3cloudcentral-update."))
     # tar's archive member names stay relative, while its root maps to fake-root.
     script = script.replace(" -C / ", " -C " + shlex.quote(str(root)) + " ")
     script = script.replace('"/$edge_path"', '"' + str(root) + '/$edge_path"')
@@ -172,14 +172,14 @@ def test_update_rollback_against_fake_root(tmp_path, legacy_go, failure):
     script_path.write_text(script, encoding="utf-8")
     env = dict(os.environ, PATH=str(mock_bin) + os.pathsep + os.environ["PATH"], FAKE_ROOT=str(root), FAKE_FAIL=failure, FAKE_UNKNOWN_PID=str(os.getpid()))
     result = subprocess.run([shutil.which("sh"), str(script_path)], text=True, capture_output=True, env=env, check=False, timeout=30)
-    assert not (root / "var/run/edgehub-update.lock").exists(), result.stderr
+    assert not (root / "var/run/o3cloudcentral-update.lock").exists(), result.stderr
     assert running.exists(), result.stderr
     if failure == "success":
         assert result.returncode == 0, result.stderr
         assert wrapper.read_bytes() != old_wrapper
         assert config.read_text() == "new-config"
         assert (runtime / "native-python").read_text() == "new-runtime"
-        assert not list((root / "var/tmp").glob("edgehub-rollback.*"))
+        assert not list((root / "var/tmp").glob("o3cloudcentral-rollback.*"))
     elif failure in ("stopfail", "unknownpid"):
         assert result.returncode != 0
         # The partially started new process could still use these files. A failed
@@ -194,7 +194,7 @@ def test_update_rollback_against_fake_root(tmp_path, legacy_go, failure):
         assert sum(action[0] == "add" for action in actions) == 1
         assert sum(action[0] == "set" for action in actions) == 1
         assert not any(action[0] == "delete" for action in actions)
-        backups = list((root / "var/tmp").glob("edgehub-rollback.*"))
+        backups = list((root / "var/tmp").glob("o3cloudcentral-rollback.*"))
         assert len(backups) == 1
         assert (backups[0] / "config.json").read_text() == original_config
         assert "backup:" in result.stderr
@@ -210,9 +210,9 @@ def test_update_rollback_against_fake_root(tmp_path, legacy_go, failure):
             assert (runtime / "old-only-file").read_text() == "original runtime-only file"
             assert not (runtime / "new-only-file").exists()
         if failure not in ("sha", "backup"):
-            backups = list((root / "var/tmp").glob("edgehub-rollback.*"))
+            backups = list((root / "var/tmp").glob("o3cloudcentral-rollback.*"))
             assert len(backups) == 1
             assert backups[0].stat().st_mode & 0o777 == 0o700
             assert (backups[0] / "config.json").read_text() == original_config
     expected_policy = "old-policy" if failure in ("backup", "sha") else "new-current-policy"
-    assert (root / "var/db/edgehub/policy.json").read_text() == expected_policy
+    assert (root / "var/db/o3cloudcentral/policy.json").read_text() == expected_policy

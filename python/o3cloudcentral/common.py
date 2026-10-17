@@ -22,7 +22,7 @@ import httpx
 
 DEFAULT_GATEWAY_LISTEN = "0.0.0.0:2222"
 MAX_JSON = 128 << 10
-INSTALLER_MAGIC = b"EHUB001!"
+INSTALLER_MAGIC = b"O3CC001!"
 
 
 def utcnow() -> str:
@@ -165,7 +165,7 @@ def desired_snapshot(state: dict, site: dict) -> dict:
 def atomic_json(path: str | Path, value: dict) -> None:
     path = Path(path)
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(prefix=".edgehub-", dir=path.parent)
+    fd, temporary = tempfile.mkstemp(prefix=".o3cloudcentral-", dir=path.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
             if os.name != "nt":

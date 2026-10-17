@@ -10,7 +10,7 @@ from unittest.mock import patch
 import asyncssh
 from asyncssh.misc import map_handler_name
 
-from edgehub.agent import AgentControl, collect_identity, run_agent, split_endpoint, validate_policy
+from o3cloudcentral.agent import AgentControl, collect_identity, run_agent, split_endpoint, validate_policy
 
 
 def available_port():
@@ -62,7 +62,7 @@ class FixtureSSH(asyncssh.SSHServer):
     def connection_made(self, connection):
         self.connection = connection
         self.fixture.connections.add(connection)
-        for name, handler in (("policy-v1@edgehub", self.policy), ("identity-v1@edgehub", self.identity), ("keepalive@edgehub", self.keepalive)):
+        for name, handler in (("policy-v1@o3cloudcentral", self.policy), ("identity-v1@o3cloudcentral", self.identity), ("keepalive@o3cloudcentral", self.keepalive)):
             setattr(connection, "_process_" + map_handler_name(name) + "_global_request", handler)
 
     def begin_auth(self, username):
@@ -151,9 +151,9 @@ class AgentIntegrationTests(unittest.IsolatedAsyncioTestCase):
 
     async def roundtrip(self, port):
         reader, writer = await asyncio.open_connection("127.0.0.1", port)
-        writer.write(b"edgehub-python")
+        writer.write(b"o3cloudcentral-python")
         await writer.drain()
-        self.assertEqual(await asyncio.wait_for(reader.readexactly(14), 3), b"edgehub-python")
+        self.assertEqual(await asyncio.wait_for(reader.readexactly(len(b"o3cloudcentral-python")), 3), b"o3cloudcentral-python")
         writer.close()
         await writer.wait_closed()
 
@@ -188,7 +188,7 @@ class AgentIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.control.snapshot()["paused"])
 
     async def test_policy_change_closes_old_listener_and_rebuilds(self):
-        with patch("edgehub.agent.POLICY_INTERVAL", .1):
+        with patch("o3cloudcentral.agent.POLICY_INTERVAL", .1):
             self.task = asyncio.create_task(run_agent(self.path, self.stop, self.control))
             await self.wait_state("conectado")
             await self.roundtrip(self.local_port)

@@ -16,7 +16,7 @@ from typing import Callable, TypeVar
 
 from sqlalchemy import (BigInteger, Column, ForeignKey, ForeignKeyConstraint,
                         Integer, JSON, MetaData, String, Table, UniqueConstraint,
-                        create_engine, delete, insert, select, text, update)
+                        create_engine, delete, insert, inspect, select, text, update)
 from sqlalchemy.engine import Connection, make_url
 
 T = TypeVar("T")
@@ -24,58 +24,58 @@ SCHEMA_VERSION = 1
 metadata = MetaData()
 TABLE_OPTIONS = {"mysql_engine": "InnoDB", "mysql_charset": "utf8mb4", "mysql_collate": "utf8mb4_bin"}
 
-schema = Table("edgehub_schema", metadata, Column("id", Integer, primary_key=True),
+schema = Table("o3cloudcentral_schema", metadata, Column("id", Integer, primary_key=True),
                Column("version", Integer, nullable=False), **TABLE_OPTIONS)
-settings = Table("edgehub_settings", metadata,
+settings = Table("o3cloudcentral_settings", metadata,
                  Column("id", Integer, primary_key=True),
                  Column("url", String(2048), nullable=False),
                  Column("admin_hash", String(512), nullable=False),
                  Column("revision", BigInteger, nullable=False),
                  Column("import_digest", String(64)), **TABLE_OPTIONS)
-sites = Table("edgehub_sites", metadata,
+sites = Table("o3cloudcentral_sites", metadata,
               Column("id", String(64), primary_key=True),
               Column("name", String(120), nullable=False),
               Column("endpoint", String(320), nullable=False),
               Column("gateway_hash", String(64), index=True),
               Column("data", JSON, nullable=False), **TABLE_OPTIONS)
-services = Table("edgehub_services", metadata,
+services = Table("o3cloudcentral_services", metadata,
                  Column("id", String(64), primary_key=True),
-                 Column("site_id", String(64), ForeignKey("edgehub_sites.id", ondelete="CASCADE"), nullable=False, index=True),
+                 Column("site_id", String(64), ForeignKey("o3cloudcentral_sites.id", ondelete="CASCADE"), nullable=False, index=True),
                  Column("name", String(120), nullable=False),
                  Column("target", String(45), nullable=False),
                  Column("port", Integer, nullable=False),
                  Column("local_port", Integer, nullable=False),
                  Column("data", JSON, nullable=False),
-                 UniqueConstraint("id", "site_id", name="uq_edgehub_service_site"), **TABLE_OPTIONS)
-devices = Table("edgehub_devices", metadata,
+                 UniqueConstraint("id", "site_id", name="uq_o3cloudcentral_service_site"), **TABLE_OPTIONS)
+devices = Table("o3cloudcentral_devices", metadata,
                 Column("id", String(64), primary_key=True),
-                Column("site_id", String(64), ForeignKey("edgehub_sites.id", ondelete="CASCADE"), nullable=False, index=True),
+                Column("site_id", String(64), ForeignKey("o3cloudcentral_sites.id", ondelete="CASCADE"), nullable=False, index=True),
                 Column("name", String(253), nullable=False),
                 Column("data", JSON, nullable=False),
-                UniqueConstraint("id", "site_id", name="uq_edgehub_device_site"), **TABLE_OPTIONS)
-grants = Table("edgehub_device_services", metadata,
+                UniqueConstraint("id", "site_id", name="uq_o3cloudcentral_device_site"), **TABLE_OPTIONS)
+grants = Table("o3cloudcentral_device_services", metadata,
                Column("device_id", String(64), primary_key=True),
                Column("service_id", String(64), primary_key=True),
                Column("site_id", String(64), nullable=False),
                Column("position", Integer, nullable=False),
-               ForeignKeyConstraint(["device_id", "site_id"], ["edgehub_devices.id", "edgehub_devices.site_id"], ondelete="CASCADE", name="fk_edgehub_grant_device"),
-               ForeignKeyConstraint(["service_id", "site_id"], ["edgehub_services.id", "edgehub_services.site_id"], ondelete="CASCADE", name="fk_edgehub_grant_service"), **TABLE_OPTIONS)
-reports = Table("edgehub_gateway_reports", metadata,
-                Column("site_id", String(64), ForeignKey("edgehub_sites.id", ondelete="CASCADE"), primary_key=True),
+               ForeignKeyConstraint(["device_id", "site_id"], ["o3cloudcentral_devices.id", "o3cloudcentral_devices.site_id"], ondelete="CASCADE", name="fk_o3cloudcentral_grant_device"),
+               ForeignKeyConstraint(["service_id", "site_id"], ["o3cloudcentral_services.id", "o3cloudcentral_services.site_id"], ondelete="CASCADE", name="fk_o3cloudcentral_grant_service"), **TABLE_OPTIONS)
+reports = Table("o3cloudcentral_gateway_reports", metadata,
+                Column("site_id", String(64), ForeignKey("o3cloudcentral_sites.id", ondelete="CASCADE"), primary_key=True),
                 Column("data", JSON, nullable=False), **TABLE_OPTIONS)
-tickets = Table("edgehub_tickets", metadata,
+tickets = Table("o3cloudcentral_tickets", metadata,
                 Column("hash", String(64), primary_key=True),
                 Column("kind", String(32), nullable=False),
                 Column("object_id", String(64), nullable=False),
-                Column("site_id", String(64), ForeignKey("edgehub_sites.id", ondelete="CASCADE"), nullable=False, index=True),
+                Column("site_id", String(64), ForeignKey("o3cloudcentral_sites.id", ondelete="CASCADE"), nullable=False, index=True),
                 Column("data", JSON, nullable=False), **TABLE_OPTIONS)
 
 
 
-auth_users = Table("edgehub_auth_users", metadata,
+auth_users = Table("o3cloudcentral_auth_users", metadata,
                    Column("id", String(64), primary_key=True),
                    Column("data", JSON, nullable=False), **TABLE_OPTIONS)
-auth_sessions = Table("edgehub_auth_sessions", metadata,
+auth_sessions = Table("o3cloudcentral_auth_sessions", metadata,
                       Column("id", String(64), primary_key=True),
                       Column("data", JSON, nullable=False), **TABLE_OPTIONS)
 
@@ -179,13 +179,16 @@ class StateRepository:
         self.engine = create_engine(dsn, pool_pre_ping=True, pool_recycle=1800,
                                     isolation_level="READ COMMITTED",
                                     connect_args={"connect_timeout": 10, "read_timeout": 20, "write_timeout": 20})
-        self._migration_lock = "edgehub-schema-" + hashlib.sha256(parsed.database.encode()).hexdigest()[:32]
+        self._migration_lock = "o3cloudcentral-schema-" + hashlib.sha256(parsed.database.encode()).hexdigest()[:32]
 
     def initialize_schema(self) -> None:
         with self.engine.connect() as conn:
             if conn.execute(text("SELECT GET_LOCK(:name, 30)"), {"name": self._migration_lock}).scalar() != 1:
                 raise RuntimeError("Outra migração do banco está em andamento.")
             try:
+                existing = inspect(conn).get_table_names()
+                if any(name.endswith("_settings") and name != settings.name for name in existing):
+                    raise RuntimeError("Esquema anterior detectado. Execute a migração antes de iniciar a central.")
                 metadata.create_all(conn)
                 conn.commit()
                 row = conn.execute(select(schema.c.version).where(schema.c.id == 1)).scalar()
@@ -266,10 +269,10 @@ class StateRepository:
         state = {"url": header["url"], "admin_hash": header["admin_hash"], "sites": {}, "devices": {}, "tickets": {}}
         for row in conn.execute(select(sites)).mappings():
             state["sites"][row["id"]] = copy.deepcopy(row["data"])
-        ordered_services = sorted(conn.execute(select(services)).mappings(), key=lambda r: (r["site_id"], r["data"].get("_edgehub_position", 0)))
+        ordered_services = sorted(conn.execute(select(services)).mappings(), key=lambda r: (r["site_id"], r["data"].get("_o3cloudcentral_position", 0)))
         for row in ordered_services:
             data = copy.deepcopy(row["data"])
-            data.pop("_edgehub_position", None)
+            data.pop("_o3cloudcentral_position", None)
             state["sites"][row["site_id"]].setdefault("services", []).append(data)
         for row in conn.execute(select(reports)).mappings():
             state["sites"][row["site_id"]]["report"] = copy.deepcopy(row["data"])
@@ -298,7 +301,7 @@ class StateRepository:
                 result[reports.name][sid] = dict(site_id=sid, data=report)
             for position, service in enumerate(service_list or []):
                 value = copy.deepcopy(service)
-                value["_edgehub_position"] = position
+                value["_o3cloudcentral_position"] = position
                 result[services.name][service["id"]] = dict(id=service["id"], site_id=sid, name=service["name"], target=service["target"], port=service["port"], local_port=service["local_port"], data=value)
         for did, device in state["devices"].items():
             value = copy.deepcopy(device)
@@ -319,7 +322,7 @@ class StateRepository:
     def _where(table, key):
         if table is grants:
             return (table.c.device_id == key[0]) & (table.c.service_id == key[1])
-        return table.c[{"edgehub_gateway_reports": "site_id", "edgehub_tickets": "hash"}.get(table.name, "id")] == key
+        return table.c[{"o3cloudcentral_gateway_reports": "site_id", "o3cloudcentral_tickets": "hash"}.get(table.name, "id")] == key
 
     def _persist(self, conn: Connection, previous: dict, current: dict) -> None:
         old, new = self._records(previous), self._records(current)

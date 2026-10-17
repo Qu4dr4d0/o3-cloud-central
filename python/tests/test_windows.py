@@ -8,17 +8,17 @@ import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from edgehub.windows_control import PIPE_SDDL, decode_command, log_tail, trusted_service_pipe
-from edgehub.windows_setup import executable_payload, validate_product_tree, _service_binary
+from o3cloudcentral.windows_control import PIPE_SDDL, decode_command, log_tail, trusted_service_pipe
+from o3cloudcentral.windows_setup import executable_payload, validate_product_tree, _service_binary
 
 
 class WindowsSafetyTests(unittest.TestCase):
     def test_independent_process_environment_does_not_reuse_parent_runtime(self):
-        from edgehub.windows_setup import independent_environment, independent_shell_environment, _launch_tray
-        with patch.dict(os.environ, {"PYINSTALLER_RESET_ENVIRONMENT": "previous", "EDGEHUB_TEST_VALUE": "retained"}):
+        from o3cloudcentral.windows_setup import independent_environment, independent_shell_environment, _launch_tray
+        with patch.dict(os.environ, {"PYINSTALLER_RESET_ENVIRONMENT": "previous", "O3CLOUDCENTRAL_TEST_VALUE": "retained"}):
             child = independent_environment()
             self.assertEqual(child["PYINSTALLER_RESET_ENVIRONMENT"], "1")
-            self.assertEqual(child["EDGEHUB_TEST_VALUE"], "retained")
+            self.assertEqual(child["O3CLOUDCENTRAL_TEST_VALUE"], "retained")
             self.assertEqual(os.environ["PYINSTALLER_RESET_ENVIRONMENT"], "previous")
             with self.assertRaises(RuntimeError):
                 with independent_shell_environment():
@@ -26,7 +26,7 @@ class WindowsSafetyTests(unittest.TestCase):
                     raise RuntimeError("launch cancelled")
             self.assertEqual(os.environ["PYINSTALLER_RESET_ENVIRONMENT"], "previous")
             with patch("subprocess.Popen") as started:
-                _launch_tray(Path("C:/Program Files/EdgeHub/123/EdgeHub.exe"))
+                _launch_tray(Path("C:/Program Files/O3CloudCentral/123/O3CloudCentral.exe"))
             self.assertEqual(started.call_args.kwargs["env"]["PYINSTALLER_RESET_ENVIRONMENT"], "1")
     def test_control_fixed_commands_and_bounded_input(self):
         self.assertEqual(decode_command(b'{"command":"disconnect"}'), "disconnect")
@@ -44,18 +44,18 @@ class WindowsSafetyTests(unittest.TestCase):
 
     def test_payload_strips_only_valid_one_use_bundle(self):
         with tempfile.TemporaryDirectory() as directory:
-            executable = Path(directory) / "EdgeHub.exe"
+            executable = Path(directory) / "O3CloudCentral.exe"
             base, bundle = b"MZ-pyinstaller-runtime", b'{"kind":"agent"}'
-            executable.write_bytes(base + bundle + struct.pack("<Q", len(bundle)) + b"EHUB001!")
+            executable.write_bytes(base + bundle + struct.pack("<Q", len(bundle)) + b"O3CC001!")
             self.assertEqual(executable_payload(executable), base)
-            executable.write_bytes(base + struct.pack("<Q", 1 << 20) + b"EHUB001!")
+            executable.write_bytes(base + struct.pack("<Q", 1 << 20) + b"O3CC001!")
             with self.assertRaises(ValueError):
                 executable_payload(executable)
 
     def test_recursive_removal_rejects_other_names_and_redirects(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            product = root / "EdgeHub"
+            product = root / "O3 Cloud Central"
             product.mkdir()
             validate_product_tree(product)
             with self.assertRaises(ValueError):
@@ -76,14 +76,14 @@ class WindowsSafetyTests(unittest.TestCase):
             value = log_tail(log)
             self.assertLessEqual(len(value), 16000)
             self.assertTrue(value.endswith("latest"))
-        command = _service_binary(Path("C:/Program Files/EdgeHub/abc/EdgeHub.exe"), Path("C:/ProgramData/EdgeHub/config.json"))
+        command = _service_binary(Path("C:/Program Files/O3CloudCentral/abc/O3CloudCentral.exe"), Path("C:/ProgramData/O3CloudCentral/config.json"))
         self.assertIn('"C:', command)
         self.assertIn("windows-service --config", command)
 
 
 class CommandLineTests(unittest.TestCase):
     def test_cli_native_flags_and_private_mode_are_explicit(self):
-        from edgehub.cli import parser
+        from o3cloudcentral.cli import parser
         arguments = parser().parse_args(["install", "--desktop-shortcut=false", "--setup-confirmed", "--quiet"])
         self.assertFalse(arguments.desktop_shortcut)
         self.assertTrue(arguments.setup_confirmed)
@@ -92,11 +92,11 @@ class CommandLineTests(unittest.TestCase):
         self.assertTrue(parser().parse_args(["central", "--internal-only"]).internal_only)
 
     def test_cli_migration_dry_run_never_initializes_or_exports_state(self):
-        from edgehub.cli import main
+        from o3cloudcentral.cli import main
         repository = MagicMock()
         repository.import_legacy.return_value = {"sites": 2, "devices": 3, "services": 4, "tickets": 0, "dry_run": True}
         output = io.StringIO()
-        with patch("edgehub.cli.open_repository", return_value=repository) as opened, patch("sys.stdout", output):
+        with patch("o3cloudcentral.cli.open_repository", return_value=repository) as opened, patch("sys.stdout", output):
             result = main(["migrate-state", "--legacy", "private/state.json", "--database-url", "mysql+pymysql://private", "--dry-run"])
         self.assertEqual(result, 0)
         opened.assert_called_once_with("mysql+pymysql://private", initialize=False)
@@ -108,7 +108,7 @@ class CommandLineTests(unittest.TestCase):
 
 class PrivateModeTests(unittest.IsolatedAsyncioTestCase):
     async def test_optional_peer_filter_never_trusts_forwarded_for(self):
-        from edgehub.cli import PrivateOnly
+        from o3cloudcentral.cli import PrivateOnly
         seen = []
         async def application(scope, receive, send):
             seen.append(scope["client"][0])
@@ -129,7 +129,7 @@ class PrivateModeTests(unittest.IsolatedAsyncioTestCase):
 class LegacyUpgradeTests(unittest.IsolatedAsyncioTestCase):
     async def test_legacy_bootstrap_is_once_and_preserves_all_identity_material(self):
         import asyncssh
-        from edgehub.windows_setup import prepare_direct_upgrade
+        from o3cloudcentral.windows_setup import prepare_direct_upgrade
         key = asyncssh.generate_private_key("ssh-ed25519").export_public_key().decode()
         initial = {"kind": "agent", "id": "agent-old", "private_key": "unchanged-private-key", "token": "unchanged-token",
             "url": "https://legacy-central.invalid:8443", "ca": "unchanged-ca"}
@@ -137,7 +137,7 @@ class LegacyUpgradeTests(unittest.IsolatedAsyncioTestCase):
             path = Path(folder) / "config.json"
             path.write_text(json.dumps(initial))
             request = AsyncMock(return_value={"endpoint": "pf.example:2222", "host_key": key, "lease_seconds": 300})
-            with patch("edgehub.common.api_request", request):
+            with patch("o3cloudcentral.common.api_request", request):
                 updated = await prepare_direct_upgrade(path)
                 self.assertEqual(await prepare_direct_upgrade(path), updated)
             request.assert_awaited_once()
@@ -148,7 +148,7 @@ class LegacyUpgradeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_failed_or_wrong_identity_lookup_never_changes_config(self):
         import asyncssh
-        from edgehub.windows_setup import prepare_direct_upgrade
+        from o3cloudcentral.windows_setup import prepare_direct_upgrade
         key = asyncssh.generate_private_key("ssh-ed25519").export_public_key().decode()
         initial = {"kind": "agent", "id": "agent-old", "private_key": "keep", "token": "keep", "url": "https://old.invalid:8443", "ca": "keep"}
         with tempfile.TemporaryDirectory() as folder:
@@ -158,7 +158,7 @@ class LegacyUpgradeTests(unittest.IsolatedAsyncioTestCase):
             for response in (OSError("offline"), {"id": "different-agent", "endpoint": "pf.example:2222", "host_key": key, "lease_seconds": 300},
                              {"endpoint": "pf.example", "host_key": key, "lease_seconds": 300}):
                 request = AsyncMock(side_effect=response) if isinstance(response, Exception) else AsyncMock(return_value=response)
-                with self.subTest(response=type(response).__name__), patch("edgehub.common.api_request", request), self.assertRaises(ValueError):
+                with self.subTest(response=type(response).__name__), patch("o3cloudcentral.common.api_request", request), self.assertRaises(ValueError):
                     await prepare_direct_upgrade(path)
                 self.assertEqual(path.read_bytes(), raw)
 
@@ -166,37 +166,37 @@ class LegacyUpgradeTests(unittest.IsolatedAsyncioTestCase):
 @unittest.skipUnless(os.name == "nt", "Windows-specific APIs")
 class WindowsNativeTests(unittest.TestCase):
     def test_uac_launch_gets_independent_environment_without_real_elevation(self):
-        from edgehub.windows_setup import elevate
+        from o3cloudcentral.windows_setup import elevate
         from win32com.shell import shell
         process = MagicMock()
         def fake_launch(**arguments):
             self.assertEqual(arguments["lpVerb"], "runas")
             self.assertEqual(os.environ.get("PYINSTALLER_RESET_ENVIRONMENT"), "1")
             return {"hProcess": process}
-        with patch.dict(os.environ, {"PYINSTALLER_RESET_ENVIRONMENT": "previous"}), patch.object(shell, "ShellExecuteEx", side_effect=fake_launch), patch("edgehub.windows_setup._self_command", return_value=["EdgeHub.exe", "uninstall"]):
+        with patch.dict(os.environ, {"PYINSTALLER_RESET_ENVIRONMENT": "previous"}), patch.object(shell, "ShellExecuteEx", side_effect=fake_launch), patch("o3cloudcentral.windows_setup._self_command", return_value=["O3CloudCentral.exe", "uninstall"]):
             elevate(["uninstall"], wait=False)
             self.assertEqual(os.environ["PYINSTALLER_RESET_ENVIRONMENT"], "previous")
         process.Close.assert_called_once()
     def test_native_locations_and_pipe_descriptor(self):
         import win32security
-        from edgehub.windows_setup import product_locations
+        from o3cloudcentral.windows_setup import product_locations
         locations = product_locations()
         self.assertEqual(locations["programs"].name, "O3 Cloud Central")
         self.assertEqual(locations["data"].name, "O3 Cloud Central")
         self.assertEqual(locations["menu"].name, "O3 Cloud Central.lnk")
-        self.assertEqual(product_locations(legacy=True)["data"].name, "EdgeHub")
+        with self.assertRaises(ValueError): product_locations(legacy=True)
         descriptor = win32security.ConvertStringSecurityDescriptorToSecurityDescriptor(PIPE_SDDL, 1)
         self.assertIsNotNone(descriptor.GetSecurityDescriptorDacl())
 
     def test_offline_and_online_icons_are_distinct(self):
-        from edgehub.windows import tray_image
+        from o3cloudcentral.windows import tray_image
         offline, online = tray_image(False), tray_image(True)
         self.assertEqual(offline.size, (64, 64))
         self.assertNotEqual(offline.getpixel((53, 53)), online.getpixel((53, 53)))
 
     def test_application_registration_has_uninstaller_startup_and_64_bit_view(self):
         import winreg
-        from edgehub.windows_setup import _registration, APP_KEY, RUN_KEY
+        from o3cloudcentral.windows_setup import _registration, APP_KEY, RUN_KEY
         recorded = []
         opened = []
         class Key:
@@ -223,7 +223,7 @@ class WindowsNativeTests(unittest.TestCase):
 
     def test_privileged_uninstall_helper_rejects_other_allowed_identities(self):
         import win32security
-        from edgehub.windows_setup import verify_helper_acl
+        from o3cloudcentral.windows_setup import verify_helper_acl
         owner = win32security.ConvertStringSidToSid("S-1-5-32-544")
         admin = win32security.ConvertStringSidToSid("S-1-5-32-544")
         system = win32security.ConvertStringSidToSid("S-1-5-18")

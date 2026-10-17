@@ -75,7 +75,7 @@ def portal_ssl_context(config: dict) -> ssl.SSLContext:
     # MemoryBIO handshake checks the supplied server chain against this CA.
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-    with tempfile.TemporaryDirectory(prefix="edgehub-tls-") as directory:
+    with tempfile.TemporaryDirectory(prefix="o3cloudcentral-tls-") as directory:
         key_path, cert_path = Path(directory) / "key.pem", Path(directory) / "cert.pem"
         key_path.write_text(config["portal_key"], encoding="ascii")
         key_path.chmod(0o600)
@@ -165,7 +165,7 @@ class GatewayPortal:
             return self.error(404, "recurso não encontrado")
         path, download = route
         if path in ("/install/windows.css", "/favicon.ico", "/brand/logo.png"):
-            configured_root = os.environ.get("EDGEHUB_RESOURCE_ROOT")
+            configured_root = os.environ.get("O3CLOUDCENTRAL_RESOURCE_ROOT")
             root = Path(configured_root) if configured_root else Path(__file__).resolve().parents[2]
             resource, content_type = {
                 "/install/windows.css": ("web/install.css", "text/css"),
@@ -197,7 +197,7 @@ class GatewayPortal:
                     return self.error(413, "cadastro inválido ou muito grande")
                 if len(body) > MAX_ENROLLMENT:
                     return self.error(413, "cadastro excede o limite")
-            headers = {"Authorization": "Bearer " + self.config["token"], "X-EdgeHub-Gateway": "1"}
+            headers = {"Authorization": "Bearer " + self.config["token"], "X-O3CloudCentral-Gateway": "1"}
             if body is not None:
                 headers["Content-Type"] = "application/json"
             limit = MAX_INSTALLER if download else (MAX_ENROLLMENT if body is not None else MAX_PAGE)

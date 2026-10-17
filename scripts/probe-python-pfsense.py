@@ -2,7 +2,7 @@
 """Ephemeral native gateway functional test. Never installs a product/service.
 
 Run using the private bundle's Python, PYTHONHOME, LD_LIBRARY_PATH, PYTHONPATH
-and EDGEHUB_RESOURCE_ROOT. All sockets bind 127.0.0.1 with kernel-chosen ports;
+and O3CLOUDCENTRAL_RESOURCE_ROOT. All sockets bind 127.0.0.1 with kernel-chosen ports;
 all configuration/keys/policy live in one private temporary directory.
 """
 from __future__ import annotations
@@ -29,11 +29,11 @@ from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID
 from asyncssh.constants import MSG_REQUEST_SUCCESS
 
-from edgehub.gateway import Gateway
-from edgehub.gateway_policy import snapshot_revision, store_policy
-from edgehub.gateway_portal import private_client_context
-from edgehub.agent import PinnedClient
-from edgehub import __version__
+from o3cloudcentral.gateway import Gateway
+from o3cloudcentral.gateway_policy import snapshot_revision, store_policy
+from o3cloudcentral.gateway_portal import private_client_context
+from o3cloudcentral.agent import PinnedClient
+from o3cloudcentral import __version__
 
 
 def available_port():
@@ -95,7 +95,7 @@ async def functional_probe(directory):
         if request.path == "/api/gateway/sync":
             reports.append(await request.json())
             return web.json_response(snapshot)
-        assert request.headers.get("X-EdgeHub-Gateway") == "1"
+        assert request.headers.get("X-O3CloudCentral-Gateway") == "1"
         if request.path.startswith("/install/windows/"):
             return web.Response(text="Ephemeral installation page")
         return web.Response(status=404)
@@ -130,12 +130,12 @@ async def functional_probe(directory):
         async with asyncssh.connect("127.0.0.1", gateway_port, username="native-terminal",
                 client_keys=[device_key], known_hosts=(), client_factory=lambda: PinnedClient(gateway.host_key),
                 agent_path=None, config=None, preferred_auth=["publickey"], encoding=None) as connection:
-            success, packet = await connection._make_global_request(b"policy-v1@edgehub")
+            success, packet = await connection._make_global_request(b"policy-v1@o3cloudcentral")
             assert success == MSG_REQUEST_SUCCESS
             policy = json.loads(packet.get_remaining_payload())
             assert policy["control_version"] == 1 and policy["services"][0]["id"] == "native-echo"
             identity = {"hostname": "NATIVE-EPHEMERAL", "local_ip": "192.168.245.10", "agent_version": __version__, "os": "windows"}
-            success, _ = await connection._make_global_request(b"identity-v1@edgehub", json.dumps(identity).encode())
+            success, _ = await connection._make_global_request(b"identity-v1@o3cloudcentral", json.dumps(identity).encode())
             assert success == MSG_REQUEST_SUCCESS
             remote_reader, remote_writer = await connection.open_connection("127.0.0.1", target_port)
             remote_writer.write(b"native-one-port")
@@ -193,7 +193,7 @@ async def functional_probe(directory):
 def main():
     logging.basicConfig(level=logging.ERROR)
     try:
-        with tempfile.TemporaryDirectory(prefix="edgehub-native-functional-") as temporary:
+        with tempfile.TemporaryDirectory(prefix="o3cloudcentral-native-functional-") as temporary:
             result = asyncio.run(asyncio.wait_for(functional_probe(Path(temporary)), 45))
     except Exception as error:
         print(json.dumps({"status": "failed", "error_type": type(error).__name__, "product_installed": False}))

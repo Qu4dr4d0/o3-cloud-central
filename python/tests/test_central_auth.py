@@ -6,12 +6,12 @@ from datetime import timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from edgehub.central import create_app, digest, now, stamp
-from edgehub.central_auth import COOKIE
-from edgehub.crypto import hash_admin_password
+from o3cloudcentral.central import create_app, digest, now, stamp
+from o3cloudcentral.central_auth import COOKIE
+from o3cloudcentral.crypto import hash_admin_password
 from test_central import MemoryRepository
 
-HEADERS = {'X-EdgeHub-Request':'1'}
+HEADERS = {'X-O3CloudCentral-Request':'1'}
 ADMIN_PASSWORD = 'fixture-admin-password-123'
 USER_PASSWORD = 'fixture-technician-password-123'
 
@@ -119,7 +119,7 @@ def test_session_expiry_and_admin_rotation_revoke_all_its_sessions(accounts):
 
 def test_bad_login_generic_error_rate_limit_and_no_state_changes(accounts,monkeypatch):
     client,repository,app=accounts
-    from edgehub import central
+    from o3cloudcentral import central
     monkeypatch.setattr(central,'check_admin_password',lambda *_:False)
     before=copy.deepcopy(repository.read())
     existing=login(client,password='bad')

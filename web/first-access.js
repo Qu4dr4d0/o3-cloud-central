@@ -5,7 +5,7 @@ form.addEventListener('submit',async event=>{
  if(data.get('new_password')!==data.get('confirmation')){error.textContent='A confirmação não coincide com a nova senha.';error.hidden=false;return}
  button.disabled=true;
  try{
-  const response=await fetch('/api/admin/account/password',{method:'POST',headers:{'Content-Type':'application/json','X-EdgeHub-Request':'1'},body:JSON.stringify({current_password:data.get('current_password'),new_password:data.get('new_password')})});
+  const response=await fetch('/api/admin/account/password',{method:'POST',headers:{'Content-Type':'application/json','X-O3CloudCentral-Request':'1'},body:JSON.stringify({current_password:data.get('current_password'),new_password:data.get('new_password')})});
   if(response.status===401){window.location.replace('/login');return}
   if(!response.ok)throw new Error((await response.text()).trim());
   form.reset();window.location.replace('/login?password=changed');

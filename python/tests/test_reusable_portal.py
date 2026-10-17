@@ -18,10 +18,10 @@ import httpx
 import pytest
 import uvicorn
 
-from edgehub.central import create_app
-from edgehub.common import embedded_bundle, enroll
-from edgehub.crypto import initialize_pki, new_gateway_portal_csr
-from edgehub.gateway_portal import GatewayPortal
+from o3cloudcentral.central import create_app
+from o3cloudcentral.common import embedded_bundle, enroll
+from o3cloudcentral.crypto import initialize_pki, new_gateway_portal_csr
+from o3cloudcentral.gateway_portal import GatewayPortal
 from test_central import AUTH, MemoryRepository
 
 
@@ -70,8 +70,8 @@ async def _portal(config):
 
 @pytest.mark.asyncio
 async def test_reusable_installer_enrolls_two_unique_terminals_via_own_pfsense(tmp_path, monkeypatch):
-    import edgehub.central as central
-    import edgehub.common as common
+    import o3cloudcentral.central as central
+    import o3cloudcentral.common as common
 
     monkeypatch.setattr(central, "check_admin_password",
         lambda hashed, password: hashed == "test-hash" and password == "fixture-password")
@@ -86,7 +86,7 @@ async def test_reusable_installer_enrolls_two_unique_terminals_via_own_pfsense(t
     async def observe_customer_relay(request, call_next):
         if request.url.path.startswith("/install/windows/") or request.url.path == "/api/enroll":
             terminal_requests.append((request.url.path,
-                request.headers.get("x-edgehub-gateway"),
+                request.headers.get("x-o3cloudcentral-gateway"),
                 request.headers.get("authorization")))
         return await call_next(request)
 

@@ -183,7 +183,7 @@ def validate_gateway_portal(config: dict) -> None:
         if not current.not_valid_before_utc <= now < current.not_valid_after_utc:
             raise ValueError("Cadeia de certificados fora da validade.")
     # OpenSSL independently validates the private key / PEM chain syntax.
-    with tempfile.TemporaryDirectory(prefix="edgehub-tls-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="o3cloudcentral-tls-") as tmp:
         cp, kp = Path(tmp)/"cert.pem", Path(tmp)/"key.pem"
         cp.write_text(config["portal_cert"], encoding="ascii")
         kp.write_text(config["portal_key"], encoding="ascii")

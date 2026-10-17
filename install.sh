@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eu
-VERSION=0.6.6
+VERSION=0.7.0
 REPO=Qu4dr4d0/o3-cloud-central
 case "${1:-}" in -h|--help) echo "Uso: sudo sh install.sh --url https://central.exemplo.com:8443 [--upgrade]"; exit 0;; esac
 [ "$(id -u)" -eq 0 ] || { echo "Execute com sudo." >&2; exit 1; }

@@ -1,7 +1,7 @@
-# Pacote pfSense 0.6.4
+# Pacote pfSense 0.7.0
 
 A instalação inicial continua pelo comando gerado ao cadastrar o cliente na central.
-O pacote inclui seu próprio runtime Python em `/usr/local/libexec/edgehub`.
+O pacote inclui seu próprio runtime Python em `/usr/local/libexec/o3cloudcentral`.
 Não altera os repositórios, o Python do sistema, as regras ou o SSH administrativo.
 
 Após instalar:

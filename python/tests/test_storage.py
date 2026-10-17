@@ -1,7 +1,7 @@
 """Real MariaDB/MySQL integration tests against an explicitly disposable DB.
 
-Set EDGEHUB_TEST_DSN to mysql+pymysql://.../edgehub_test... . No SQLite or mock
-database is accepted. Only tables defined by EdgeHub metadata are removed, and
+Set O3CLOUDCENTRAL_TEST_DSN to mysql+pymysql://.../o3cloudcentral_test... . No SQLite or mock
+database is accepted. Only tables defined by O3CloudCentral metadata are removed, and
 both the requested and connected database names are checked before every reset.
 """
 from __future__ import annotations
@@ -18,24 +18,24 @@ from sqlalchemy import delete, insert, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
 
-from edgehub.storage import (StateRepository, devices, empty_state, grants,
+from o3cloudcentral.storage import (StateRepository, devices, empty_state, grants,
                             metadata, reports, services, sites, tickets, validate_state)
 
 
 def _assert_test_database(dsn: str) -> str:
     parsed = make_url(dsn)
     database = parsed.database or ""
-    if parsed.drivername not in ("mysql+pymysql", "mariadb+pymysql") or not database.startswith("edgehub_test"):
-        raise ValueError("Integration tests require a MariaDB/MySQL database starting with edgehub_test.")
+    if parsed.drivername not in ("mysql+pymysql", "mariadb+pymysql") or not database.startswith("o3cloudcentral_test"):
+        raise ValueError("Integration tests require a MariaDB/MySQL database starting with o3cloudcentral_test.")
     return database
 
 
 def _reset_test_tables(repository: StateRepository, database: str) -> None:
-    if not database.startswith("edgehub_test"):
-        raise ValueError("Refusing cleanup outside an EdgeHub test database.")
+    if not database.startswith("o3cloudcentral_test"):
+        raise ValueError("Refusing cleanup outside an O3CloudCentral test database.")
     with repository.engine.connect() as conn:
         actual = conn.execute(text("SELECT DATABASE()")).scalar_one()
-        if actual != database or not actual.startswith("edgehub_test"):
+        if actual != database or not actual.startswith("o3cloudcentral_test"):
             raise ValueError("Connected database differs from the authorized test database.")
         conn.rollback()
         # Never disable foreign keys or delete arbitrary tables in the database.
@@ -45,9 +45,9 @@ def _reset_test_tables(repository: StateRepository, database: str) -> None:
 
 @pytest.fixture
 def repository():
-    dsn = os.environ.get("EDGEHUB_TEST_DSN")
+    dsn = os.environ.get("O3CLOUDCENTRAL_TEST_DSN")
     if not dsn:
-        pytest.skip("Set EDGEHUB_TEST_DSN to run real MariaDB integration tests.")
+        pytest.skip("Set O3CLOUDCENTRAL_TEST_DSN to run real MariaDB integration tests.")
     database = _assert_test_database(dsn)
     instance = StateRepository(dsn)
     try:
@@ -100,14 +100,14 @@ def write_legacy(tmp_path, state: dict, name="legacy-state.json"):
 
 
 def test_database_cleanup_guard_never_accepts_production_or_sqlite():
-    for dsn in ("mysql+pymysql://user@localhost/edgehub", "mariadb+pymysql://user@localhost/customer", "sqlite:///edgehub_test.db", "mysql+pymysql://user@localhost/EDGEHUB_TEST", "mysql+pymysql://user@localhost/"):
+    for dsn in ("mysql+pymysql://user@localhost/o3cloudcentral", "mariadb+pymysql://user@localhost/customer", "sqlite:///o3cloudcentral_test.db", "mysql+pymysql://user@localhost/O3CLOUDCENTRAL_TEST", "mysql+pymysql://user@localhost/"):
         with pytest.raises(ValueError):
             _assert_test_database(dsn)
-    assert _assert_test_database("mysql+pymysql://fixture@localhost/edgehub_test") == "edgehub_test"
+    assert _assert_test_database("mysql+pymysql://fixture@localhost/o3cloudcentral_test") == "o3cloudcentral_test"
 
 
 def test_storage_rejects_other_database_engines():
-    for dsn in ("sqlite://", "sqlite:///fixture.db", "postgresql://localhost/edgehub_test", "mysql://localhost/edgehub_test"):
+    for dsn in ("sqlite://", "sqlite:///fixture.db", "postgresql://localhost/o3cloudcentral_test", "mysql://localhost/o3cloudcentral_test"):
         with pytest.raises(ValueError):
             StateRepository(dsn)
 
@@ -256,12 +256,12 @@ def test_invalid_legacy_data_never_partially_imports(repository, tmp_path):
 def test_central_api_commits_telemetry_and_revocation_in_mariadb(repository, tmp_path):
     import asyncssh
     from fastapi.testclient import TestClient
-    from edgehub.central import create_app, digest
+    from o3cloudcentral.central import create_app, digest
     (tmp_path / "ca.crt").write_text("fixture-ca", encoding="utf-8")
     state = empty_state()
     state.update(url="https://central.example:8443", admin_hash=digest("fixture-password"))
     repository.initialize(state)
-    auth = {"auth": ("admin", "fixture-password"), "headers": {"X-EdgeHub-Request": "1"}}
+    auth = {"auth": ("admin", "fixture-password"), "headers": {"X-O3CloudCentral-Request": "1"}}
     app = create_app(repository, tmp_path, monitor=False)
     with TestClient(app, base_url="https://central.example:8443") as client:
         def post(path, body):
@@ -274,7 +274,7 @@ def test_central_api_commits_telemetry_and_revocation_in_mariadb(repository, tmp
         bundle = post(f"/api/admin/sites/{site['id']}/bootstrap", {})
         key = asyncssh.generate_private_key("ssh-ed25519").export_public_key().decode()
         gateway = client.post("/api/enroll", json={"kind": "gateway", "token": bundle["token"], "public_key": key}).json()
-        proxy = {"Authorization": "Bearer " + gateway["token"], "X-EdgeHub-Gateway": "1"}
+        proxy = {"Authorization": "Bearer " + gateway["token"], "X-O3CloudCentral-Gateway": "1"}
         terminal_bundle = post(f"/api/admin/devices/{device['id']}/bootstrap", {})
         terminal_key = asyncssh.generate_private_key("ssh-ed25519").export_public_key().decode()
         enrolled = client.post("/api/enroll", headers=proxy, json={"kind": "agent", "token": terminal_bundle["token"], "public_key": terminal_key, "hostname": "CAIXA-SQL", "transport": "ssh-policy-v1"})
@@ -340,7 +340,7 @@ def test_linux_and_windows_links_survive_mariadb_roundtrip(repository):
             "id":"lnk_"+str(index)*24, "services":["svc_a"], "created":"2026-10-17T12:00:00Z",
             "expires":None, "used_count":index, "platform":platform}
     repository.initialize(state)
-    independent = StateRepository(os.environ["EDGEHUB_TEST_DSN"])
+    independent = StateRepository(os.environ["O3CLOUDCENTRAL_TEST_DSN"])
     try:
         persisted = independent.read()
         for platform in ("windows", "debian"):
@@ -353,10 +353,10 @@ def test_linux_and_windows_links_survive_mariadb_roundtrip(repository):
 
 def test_auth_users_and_hashed_sessions_persist_across_mariadb_instances(repository, tmp_path):
     from fastapi.testclient import TestClient
-    from edgehub.central import create_app
-    from edgehub.central_auth import COOKIE
-    from edgehub.crypto import hash_admin_password
-    from edgehub.central import digest
+    from o3cloudcentral.central import create_app
+    from o3cloudcentral.central_auth import COOKIE
+    from o3cloudcentral.crypto import hash_admin_password
+    from o3cloudcentral.central import digest
     state = legacy_state()
     hashed = hash_admin_password('public-test-account-password-123')
     state['users'] = {'technician':{'password_hash':hashed,'created':'2026-10-17T12:00:00Z'}}
@@ -364,7 +364,7 @@ def test_auth_users_and_hashed_sessions_persist_across_mariadb_instances(reposit
     session_id = digest(raw)
     state['sessions'] = {session_id:{'username':'technician','credential':digest(hashed),'expires':'2099-10-17T12:00:00Z'}}
     repository.initialize(state)
-    independent = StateRepository(os.environ['EDGEHUB_TEST_DSN'])
+    independent = StateRepository(os.environ['O3CLOUDCENTRAL_TEST_DSN'])
     try:
         assert independent.read() == state
         (tmp_path/'ca.crt').write_text('public-fixture')
@@ -381,7 +381,7 @@ def test_auth_users_and_hashed_sessions_persist_across_mariadb_instances(reposit
 
 def test_reusable_link_enrollment_is_atomic_and_persists_across_mariadb_instances(repository, tmp_path):
     from fastapi.testclient import TestClient
-    from edgehub.central import create_app, digest
+    from o3cloudcentral.central import create_app, digest
     from test_central import AUTH, gateway_enroll, new_service, new_site, post, public_key
     (tmp_path / "ca.crt").write_text("fixture-ca", encoding="utf-8")
     (tmp_path / "O3CloudCentral.exe").write_bytes(b"MZ-public-test-fixture")
@@ -394,7 +394,7 @@ def test_reusable_link_enrollment_is_atomic_and_persists_across_mariadb_instance
         gateway = gateway_enroll(client, site)
         link = post(client, f"/api/admin/sites/{site['id']}/install-link", {"services": [service["id"]]})
         token = link["url"].rsplit("/", 1)[-1]
-        headers = {"Authorization": "Bearer " + gateway["token"], "X-EdgeHub-Gateway": "1"}
+        headers = {"Authorization": "Bearer " + gateway["token"], "X-O3CloudCentral-Gateway": "1"}
         def enroll(key):
             return client.post("/api/enroll", headers=headers, json={"kind": "agent", "token": token,
                 "public_key": key, "hostname": "SAME-SQL-HOST", "transport": "ssh-policy-v1"})
@@ -414,7 +414,7 @@ def test_reusable_link_enrollment_is_atomic_and_persists_across_mariadb_instance
         assert all(device["services"] == [service["id"]] for device in committed["devices"].values())
         # A second SQLAlchemy engine proves metadata and terminal credentials
         # survive independently of this FastAPI process and its connection pool.
-        independent = StateRepository(os.environ["EDGEHUB_TEST_DSN"])
+        independent = StateRepository(os.environ["O3CLOUDCENTRAL_TEST_DSN"])
         try:
             assert independent.read() == committed
         finally:

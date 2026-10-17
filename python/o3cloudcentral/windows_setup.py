@@ -25,15 +25,14 @@ from pathlib import Path
 try:
     from . import __version__
 except ImportError:
-    __version__ = "0.6.6"
+    __version__ = "0.7.0"
 
-from .windows_branding import PRODUCT_NAME, SERVICE_NAME, EXECUTABLE_NAME, LEGACY_NAME, LEGACY_EXECUTABLE_NAME, resource_root
+from .windows_branding import PRODUCT_NAME, SERVICE_NAME, EXECUTABLE_NAME, resource_root
 
 UNINSTALL_KEY = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
 APP_KEY = UNINSTALL_KEY + "\\" + SERVICE_NAME
-LEGACY_APP_KEY = UNINSTALL_KEY + "\\" + LEGACY_NAME
 RUN_KEY = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
-MAGIC = b"EHUB001!"
+MAGIC = b"O3CC001!"
 PRIVATE_SDDL = "O:BAG:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)"
 _LAUNCH_ENVIRONMENT_LOCK = threading.Lock()
 
@@ -46,7 +45,7 @@ def independent_environment() -> dict[str, str]:
 @contextlib.contextmanager
 def independent_shell_environment():
     # ShellExecuteEx has no explicit environment parameter. Keep this mutation
-    # scoped to its launch call and serialize EdgeHub's own ShellExecute calls.
+    # scoped to its launch call and serialize O3CloudCentral's own ShellExecute calls.
     with _LAUNCH_ENVIRONMENT_LOCK:
         previous = os.environ.get("PYINSTALLER_RESET_ENVIRONMENT")
         os.environ["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
@@ -67,7 +66,8 @@ def _windows():
 def product_locations(*, legacy=False) -> dict[str, Path]:
     _windows()
     from win32com.shell import shell, shellcon
-    name = LEGACY_NAME if legacy else PRODUCT_NAME
+    if legacy: raise ValueError("Versões antigas exigem reinstalação limpa.")
+    name = PRODUCT_NAME
     locations = {
         "programs": (shellcon.CSIDL_PROGRAM_FILES, name),
         "data": (shellcon.CSIDL_COMMON_APPDATA, name),
@@ -88,7 +88,7 @@ def valid_product_path(path: Path | str) -> bool:
 
 
 def validate_product_tree(path: Path):
-    if not valid_product_path(path) or path.name not in (PRODUCT_NAME, LEGACY_NAME):
+    if not valid_product_path(path) or path.name != PRODUCT_NAME:
         raise ValueError("Caminho de remoção O3 Cloud Central inválido.")
     # Checking every ancestor prevents a writable junction redirecting the tree.
     for item in [path, *path.parents]:
@@ -107,7 +107,7 @@ def validate_product_tree(path: Path):
 
 def executable_payload(path: Path | None = None) -> bytes:
     data = (path or Path(sys.executable)).read_bytes()
-    if len(data) >= 16 and data[-8:] in (MAGIC, b"EDGEHUB1"):
+    if len(data) >= 16 and data[-8:] == MAGIC:
         size = struct.unpack("<Q", data[-16:-8])[0]
         if size > 128 << 10 or size > len(data) - 16:
             raise ValueError("Cadastro embutido inválido.")
@@ -148,7 +148,7 @@ def is_admin() -> bool:
 def _self_command(*args) -> list[str]:
     if getattr(sys, "frozen", False):
         return [sys.executable, *args]
-    return [sys.executable, "-m", "edgehub", *args]
+    return [sys.executable, "-m", "o3cloudcentral", *args]
 
 
 def elevate(arguments: list[str], *, wait=True):
@@ -202,7 +202,7 @@ def setup_lock():
     import win32security
     security = pywintypes.SECURITY_ATTRIBUTES()
     security.SECURITY_DESCRIPTOR = win32security.ConvertStringSecurityDescriptorToSecurityDescriptor(PRIVATE_SDDL, 1)
-    mutex = win32event.CreateMutex(security, False, r"Global\EdgeHub.Setup.v1")
+    mutex = win32event.CreateMutex(security, False, r"Global\O3CloudCentral.Setup.v1")
     result = win32event.WaitForSingleObject(mutex, 0)
     if result not in (0, 128):
         mutex.Close()
@@ -306,7 +306,7 @@ def installed_service_name() -> str | None:
     import win32service
     manager = win32service.OpenSCManager(None, None, win32service.SC_MANAGER_CONNECT)
     try:
-        for name, old in ((SERVICE_NAME, False), (LEGACY_NAME, True)):
+        for name, old in ((SERVICE_NAME, False),):
             try:
                 service = win32service.OpenService(manager, name, win32service.SERVICE_QUERY_CONFIG)
             except pywintypes.error as exc:
@@ -329,9 +329,10 @@ def verify_service_installation(service, locations: dict, *, legacy=False):
     import win32service
     configuration = win32service.QueryServiceConfig(service)
     command = win32api.CommandLineToArgv(configuration[3])
-    expected = LEGACY_EXECUTABLE_NAME if legacy else EXECUTABLE_NAME
+    if legacy: raise ValueError("Versões antigas exigem reinstalação limpa.")
+    expected = EXECUTABLE_NAME
     image = Path(command[0]) if command else Path()
-    modes = {"agent", "windows-service"} if legacy else {"windows-service"}
+    modes = {"windows-service"}
     if (not image.is_absolute() or image.name.casefold() != expected.casefold() or
             not image.is_relative_to(locations["programs"]) or
             len(command) != 4 or command[1] not in modes or command[2] != "--config" or
@@ -387,14 +388,14 @@ def _start_service_ready(service):
 
 def _remove_registration(*, legacy=False):
     import winreg
-    name = LEGACY_NAME if legacy else SERVICE_NAME
+    name = SERVICE_NAME
     try:
         with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, RUN_KEY, 0, winreg.KEY_SET_VALUE | winreg.KEY_WOW64_64KEY) as key:
             winreg.DeleteValue(key, name)
     except FileNotFoundError:
         pass
     try:
-        winreg.DeleteKeyEx(winreg.HKEY_LOCAL_MACHINE, LEGACY_APP_KEY if legacy else APP_KEY, winreg.KEY_WOW64_64KEY)
+        winreg.DeleteKeyEx(winreg.HKEY_LOCAL_MACHINE, APP_KEY, winreg.KEY_WOW64_64KEY)
     except FileNotFoundError:
         pass
 
@@ -473,36 +474,26 @@ async def install_agent(bundle=None, *, upgrade=False, desktop_shortcut=True, co
         raise RuntimeError("Instale usando O3CloudCentral.exe empacotado.")
     from .common import enroll
     import win32service
-    locations, legacy = product_locations(), product_locations(legacy=True)
+    locations = product_locations()
     config = locations["data"] / "config.json"
     with setup_lock():
-        for roots in (locations, legacy):
-            for name in ("programs", "data"):
-                validate_product_tree(roots[name])
+        for name in ("programs", "data"):
+            validate_product_tree(locations[name])
         manager = win32service.OpenSCManager(None, None, win32service.SC_MANAGER_ALL_ACCESS)
-        current = previous = service = None
-        created = migrated = False
+        current = service = None
+        created = False
         old_configuration = None
         try:
             current = _open_service(manager, SERVICE_NAME)
-            previous = _open_service(manager, LEGACY_NAME)
-            if current and previous:
-                raise ValueError("Foram encontrados dois serviços; atualização interrompida para preservar as identidades.")
-            existing = current or previous
             if upgrade:
-                if not existing:
-                    raise ValueError("Não há identidade de terminal compatível para atualizar.")
-                old_roots = legacy if previous else locations
-                old_configuration = verify_service_installation(existing, old_roots, legacy=bool(previous))
-                protect_directory(old_roots["data"], public=False)
-                if previous:
-                    copy_upgrade_data(legacy["data"], locations["data"])
-                    migrated = True
+                if not current:
+                    raise ValueError("Nao ha instalacao O3 Cloud Central para atualizar; use o instalador completo.")
+                old_configuration = verify_service_installation(current, locations)
                 await prepare_direct_upgrade(config)
-            elif existing or config.exists() or (legacy["data"] / "config.json").exists():
-                raise ValueError("O3 Cloud Central já instalado; atualize para preservar sua identidade.")
+            elif current or config.exists():
+                raise ValueError("O3 Cloud Central ja instalado; atualize para preservar sua identidade.")
             elif not isinstance(bundle, dict) or bundle.get("kind") != "agent":
-                raise ValueError("Cadastro não é de terminal.")
+                raise ValueError("Cadastro nao e de terminal.")
             protect_directory(locations["data"], public=False)
             protect_directory(locations["programs"], public=True)
             payload = executable_payload()
@@ -511,19 +502,15 @@ async def install_agent(bundle=None, *, upgrade=False, desktop_shortcut=True, co
             destination = version_dir / EXECUTABLE_NAME
             if destination.exists():
                 if destination.read_bytes() != payload:
-                    raise ValueError("Arquivo existente de outra versão.")
+                    raise ValueError("Arquivo existente de outra versao.")
             else:
                 with destination.open("xb") as output:
-                    output.write(payload)
-                    output.flush()
-                    os.fsync(output.fileno())
+                    output.write(payload); output.flush(); os.fsync(output.fileno())
             if not upgrade:
                 await enroll(bundle, config)
-            if existing:
-                _stop_service(existing)
-                for roots in (locations, legacy):
-                    _stop_owned_trays(roots["programs"])
             if current:
+                _stop_service(current)
+                _stop_owned_trays(locations["programs"])
                 service = current
                 win32service.ChangeServiceConfig(service, win32service.SERVICE_NO_CHANGE,
                     win32service.SERVICE_AUTO_START, win32service.SERVICE_NO_CHANGE,
@@ -534,57 +521,27 @@ async def install_agent(bundle=None, *, upgrade=False, desktop_shortcut=True, co
                     win32service.SERVICE_ERROR_NORMAL, _service_binary(destination, config), None, 0, None, None, None)
                 created = True
             win32service.ChangeServiceConfig2(service, win32service.SERVICE_CONFIG_DESCRIPTION,
-                "Conexão TCP por SSH com recuperação automática e controle local.")
+                "Conexao TCP por SSH com recuperacao automatica e controle local.")
             _configure_recovery(service)
             _start_service_ready(service)
-            create_shortcuts(destination, locations, desktop_shortcut or bool(previous and legacy["desktop"].exists()))
+            create_shortcuts(destination, locations, desktop_shortcut)
             _registration(destination, locations)
         except Exception:
             if service:
                 try:
                     _stop_service(service)
-                except Exception as stop_error:
-                    # Do not delete an active service/configuration or start a
-                    # second agent. Both identities and SCM entries stay intact
-                    # for an administrator to inspect and complete recovery.
-                    raise RuntimeError("A atualização falhou e não foi possível confirmar o encerramento do novo serviço. "
-                        "Os arquivos e os registros dos serviços foram preservados; o serviço anterior não foi reiniciado. "
-                        "Verifique o estado dos serviços no Windows antes de tentar novamente.") from stop_error
+                except Exception as error:
+                    raise RuntimeError("Falha ao parar o servico durante a recuperacao; arquivos e identidade preservados.") from error
                 if created:
-                    try:
-                        win32service.DeleteService(service)
-                    except Exception as deletion_error:
-                        raise RuntimeError("O novo serviço foi parado, mas sua remoção não foi confirmada. "
-                            "Os arquivos e os registros dos serviços foram preservados; o serviço anterior não foi reiniciado. "
-                            "Conclua a recuperação dos serviços no Windows antes de tentar novamente.") from deletion_error
-                    with contextlib.suppress(Exception):
-                        _remove_registration()
-                        _remove_shortcuts(locations)
+                    win32service.DeleteService(service)
+                    _remove_registration()
+                    _remove_shortcuts(locations)
                 elif old_configuration:
-                    with contextlib.suppress(Exception):
-                        _restore_service(service, old_configuration)
-            if previous and old_configuration:
-                with contextlib.suppress(Exception):
-                    # The legacy service still has its original binary/config.
-                    status = win32service.QueryServiceStatusEx(previous)
-                    if status["CurrentState"] == win32service.SERVICE_STOPPED:
-                        win32service.StartService(previous, None)
-            if migrated:
-                with contextlib.suppress(Exception):
-                    _safe_remove_tree(locations["data"])
+                    _restore_service(service, old_configuration)
             raise
-        else:
-            if previous:
-                # Commit only after the new service/PID/pipe and registration work.
-                win32service.DeleteService(previous)
-                _remove_registration(legacy=True)
-                _remove_shortcuts(legacy)
-                for name in ("programs", "data"):
-                    _remove_or_schedule_tree(legacy[name])
         finally:
-            handles = {int(handle): handle for handle in (service, current, previous) if handle}
-            for handle in handles.values():
-                win32service.CloseServiceHandle(handle)
+            handles = {int(handle):handle for handle in (service,current) if handle}
+            for handle in handles.values(): win32service.CloseServiceHandle(handle)
             win32service.CloseServiceHandle(manager)
     if not quiet:
         _launch_tray(destination)
@@ -623,8 +580,8 @@ def _remove_or_schedule_tree(path: Path):
 
 
 def owned_product_image(image: Path, programs: Path) -> bool:
-    return (programs.name in (PRODUCT_NAME, LEGACY_NAME) and image.is_absolute() and
-            image.name.casefold() in (EXECUTABLE_NAME.casefold(), LEGACY_EXECUTABLE_NAME.casefold()) and
+    return (programs.name == PRODUCT_NAME and image.is_absolute() and
+            image.name.casefold() == EXECUTABLE_NAME.casefold() and
             image.is_relative_to(programs))
 
 
@@ -760,20 +717,20 @@ def uninstall_worker(*, parent_pid=0, origin_pid=0, quiet=False):
     if not is_admin():
         raise PermissionError("A remoção requer confirmação administrativa.")
     import win32service
-    locations, legacy = product_locations(), product_locations(legacy=True)
+    locations = product_locations()
     executable = Path(sys.executable)
     validate_helper(executable, locations["data"].parent)
     _wait_process(parent_pid)
     _wait_process(origin_pid)
     with setup_lock():
-        for roots in (locations, legacy):
+        for roots in (locations,):
             for name in ("programs", "data"):
                 validate_product_tree(roots[name])
         manager = win32service.OpenSCManager(None, None, win32service.SC_MANAGER_CONNECT)
         services = []
         try:
             # Verify all ownership before stopping or deleting either service.
-            for name, roots, old in ((SERVICE_NAME, locations, False), (LEGACY_NAME, legacy, True)):
+            for name, roots, old in ((SERVICE_NAME, locations, False),):
                 service = _open_service(manager, name)
                 if service:
                     services.append(service)
@@ -785,7 +742,7 @@ def uninstall_worker(*, parent_pid=0, origin_pid=0, quiet=False):
             for service in services:
                 win32service.CloseServiceHandle(service)
             win32service.CloseServiceHandle(manager)
-        for roots, old in ((locations, False), (legacy, True)):
+        for roots, old in ((locations, False),):
             _stop_owned_trays(roots["programs"])
             _remove_registration(legacy=old)
             _remove_shortcuts(roots)

@@ -11,7 +11,7 @@ client = urllib.request.build_opener(urllib.request.HTTPSHandler(context=context
 base = "https://localhost:8443"
 
 def request(path, value=None, expected=200, basic=None):
-    headers = {"X-EdgeHub-Request":"1"}
+    headers = {"X-O3CloudCentral-Request":"1"}
     if basic: headers["Authorization"] = basic
     data = json.dumps(value).encode() if value is not None else None
     if data is not None: headers["Content-Type"] = "application/json"

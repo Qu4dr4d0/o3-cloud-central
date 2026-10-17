@@ -9,7 +9,7 @@ async function api(path,data,method='POST',binary=false){
  const ctl=path==='/state'&&method==='GET'?new AbortController():null;
  const timeout=ctl?setTimeout(()=>ctl.abort(),8000):null;
  try{
-  const r=await fetch('/api/admin'+path,{method,cache:'no-store',signal:ctl?ctl.signal:undefined,headers:{'Content-Type':'application/json','X-EdgeHub-Request':'1'},body:data===undefined?undefined:JSON.stringify(data)});
+  const r=await fetch('/api/admin'+path,{method,cache:'no-store',signal:ctl?ctl.signal:undefined,headers:{'Content-Type':'application/json','X-O3CloudCentral-Request':'1'},body:data===undefined?undefined:JSON.stringify(data)});
   if(r.status===401){window.location.replace('/login');throw new Error('Sessão encerrada. Entre novamente.')}
   if(!r.ok)throw new Error((await r.text()).trim());return binary?await r.blob():await r.json();
  }finally{if(timeout)clearTimeout(timeout)}
@@ -294,7 +294,7 @@ $('#user-form').addEventListener('submit',async event=>{
 $('#users-dialog').addEventListener('close',()=>{$('#user-form').reset();$('#user-created').hidden=true;formError($('#user-form'),'')});
 $('#logout').addEventListener('click',async()=>{
  const button=$('#logout');button.disabled=true;
- try{const response=await fetch('/api/auth/logout',{method:'POST',headers:{'Content-Type':'application/json','X-EdgeHub-Request':'1'},body:'{}'});if(!response.ok&&response.status!==401)throw new Error('Não foi possível sair. Tente novamente.');passwordChanged=true;clearInterval(refreshTimer);window.location.replace('/login')}catch(error){notify(error.message)}finally{button.disabled=false}
+ try{const response=await fetch('/api/auth/logout',{method:'POST',headers:{'Content-Type':'application/json','X-O3CloudCentral-Request':'1'},body:'{}'});if(!response.ok&&response.status!==401)throw new Error('Não foi possível sair. Tente novamente.');passwordChanged=true;clearInterval(refreshTimer);window.location.replace('/login')}catch(error){notify(error.message)}finally{button.disabled=false}
 });
 document.addEventListener('click',event=>{if(!event.target.closest('#account-button')&&!event.target.closest('#account-menu'))closeAccountMenu()});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('#account-menu').hidden){closeAccountMenu();$('#account-button').focus()}});

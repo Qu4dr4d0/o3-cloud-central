@@ -1,12 +1,42 @@
 name: Verify Ubuntu installer
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths: [.github/workflows/verify-release.yml]
+  release:
+    types: [published]
 permissions:
   contents: read
 jobs:
+  migration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Get current source
+        env:
+          REPOSITORY: ${{ github.repository }}
+          REF: ${{ github.ref_name }}
+        run: git clone --depth 1 --branch "$REF" "https://github.com/$REPOSITORY.git" source
+      - name: Prepare previous release with disposable data
+        run: |
+          curl --fail --location https://raw.githubusercontent.com/Qu4dr4d0/o3-cloud-central/v0.6.6/install.sh -o /tmp/previous-installer.sh
+          sudo sh /tmp/previous-installer.sh --url https://central.example.com:8443
+          sudo /opt/o3cloudcentral/venv/bin/python /opt/o3cloudcentral/current/scripts/verify-installed.py
+          sudo env GITHUB_ACTIONS=true /opt/o3cloudcentral/venv/bin/python source/scripts/verify-migration.py before
+      - name: Download current distribution
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          gh release download v0.7.0 --repo "$REPOSITORY" --pattern o3-cloud-central-0.7.0.tar.gz --dir /tmp
+          mkdir /tmp/current-release
+          tar -xzf /tmp/o3-cloud-central-0.7.0.tar.gz -C /tmp/current-release
+      - name: Migrate and verify all retained state
+        run: |
+          sudo python3 /tmp/current-release/o3-cloud-central-0.7.0/deploy/migrate-central.py --plan
+          sudo python3 /tmp/current-release/o3-cloud-central-0.7.0/deploy/migrate-central.py
+          sudo env GITHUB_ACTIONS=true /opt/o3cloudcentral/venv/bin/python source/scripts/verify-migration.py after
+      - name: Diagnostics
+        if: failure()
+        run: sudo journalctl -u o3cloudcentral -n 100 --no-pager
   ubuntu:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -28,16 +58,21 @@ jobs:
           context=ssl.create_default_context(cafile='/etc/o3cloudcentral/ca.crt')
           req=urllib.request.Request('https://localhost:8443/api/auth/login',
               data=json.dumps({'username':'admin','password':'temporary-test-password-123'}).encode(),
-              headers={'Content-Type':'application/json','X-EdgeHub-Request':'1'})
+              headers={'Content-Type':'application/json','X-O3CloudCentral-Request':'1'})
           with urllib.request.urlopen(req,context=context) as response:
               assert not json.load(response)['must_change_password']
           print('Upgrade preserved credentials: OK')
           PY
       - name: Python tests with a separate disposable SQL database
         run: |
-          sudo mariadb -e "CREATE DATABASE edgehub_test_ci;"
+          sudo mariadb -e "CREATE DATABASE o3cloudcentral_test_ci;"
           sudo /opt/o3cloudcentral/venv/bin/python -m pip install pytest pytest-asyncio pytest-subtests
-          sudo env PYTHONPATH="$PWD/source/python" EDGEHUB_TEST_DSN="mysql+pymysql://root@localhost/edgehub_test_ci?unix_socket=/run/mysqld/mysqld.sock" /opt/o3cloudcentral/venv/bin/python -m pytest source/python/tests -q
+          sudo env PYTHONPATH="$PWD/source/python" O3CLOUDCENTRAL_TEST_DSN="mysql+pymysql://root@localhost/o3cloudcentral_test_ci?unix_socket=/run/mysqld/mysqld.sock" /opt/o3cloudcentral/venv/bin/python -m pytest source/python/tests -q
+      - name: Export schema only from the disposable installation
+        run: |
+          printf 'O3_SCHEMA_BASE64='
+          sudo mariadb-dump --no-data --databases --skip-comments --skip-dump-date --no-tablespaces o3cloudcentral | base64 -w0
+          printf '\n'
       - name: Service diagnostics on failure
         if: failure()
         run: sudo journalctl -u o3cloudcentral -n 100 --no-pager

@@ -9,8 +9,8 @@ from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 from cryptography.x509.oid import NameOID
 import pytest
 
-from edgehub.central_tls import create_tls_contexts
-from edgehub.crypto import (issue_gateway_portal, issue_server,
+from o3cloudcentral.central_tls import create_tls_contexts
+from o3cloudcentral.crypto import (issue_gateway_portal, issue_server,
                             new_gateway_portal_csr)
 
 

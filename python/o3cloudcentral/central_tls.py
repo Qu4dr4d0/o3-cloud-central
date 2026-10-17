@@ -1,4 +1,4 @@
-"""TLS chain selection for Windows and pre-migration EdgeHub trust roots.
+"""TLS chain selection for Windows and pre-migration O3CloudCentral trust roots.
 
 The ECDSA server certificate has an optional Ed25519-signed compatibility
 bridge. Schannel must receive the short ECDSA path; old agents require the bridge.
@@ -43,7 +43,7 @@ def create_tls_contexts(cert_pem: str, key_pem: str) -> TLSContexts:
         result.set_alpn_protocols(["http/1.1"])
         result.load_cert_chain(cert_path, key_path)
         return result
-    with tempfile.TemporaryDirectory(prefix="edgehub-server-tls-") as directory:
+    with tempfile.TemporaryDirectory(prefix="o3cloudcentral-server-tls-") as directory:
         folder = Path(directory)
         key_path, full_path, short_path = folder / "key.pem", folder / "full.pem", folder / "short.pem"
         key_path.write_text(key_pem, encoding="ascii")

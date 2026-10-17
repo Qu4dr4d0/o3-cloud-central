@@ -2,11 +2,11 @@
 import base64
 import pytest
 from fastapi.testclient import TestClient
-from edgehub.central import create_app
-from edgehub.crypto import hash_admin_password, check_admin_password
+from o3cloudcentral.central import create_app
+from o3cloudcentral.crypto import hash_admin_password, check_admin_password
 from test_central import MemoryRepository
 
-HEADERS = {'X-EdgeHub-Request':'1'}
+HEADERS = {'X-O3CloudCentral-Request':'1'}
 
 def test_first_access_enforced_in_backend_and_cleared_by_password_change(tmp_path):
     repo = MemoryRepository()

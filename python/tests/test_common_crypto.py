@@ -7,14 +7,14 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.x509.oid import ExtensionOID
 import pytest
 
-from edgehub.common import (INSTALLER_MAGIC, embedded_bundle, normalise_terminal_identity,
+from o3cloudcentral.common import (INSTALLER_MAGIC, embedded_bundle, normalise_terminal_identity,
                             usable_ip, validate_selection)
-from edgehub.crypto import (check_admin_password, hash_admin_password, initialize_pki,
+from o3cloudcentral.crypto import (check_admin_password, hash_admin_password, initialize_pki,
                             issue_gateway_portal, new_gateway_portal_csr, validate_gateway_portal)
 
 
 def test_password_hash_and_legacy_hash_compatibility():
-    from edgehub.common import digest
+    from o3cloudcentral.common import digest
     value = hash_admin_password("long-enough-test-password")
     assert check_admin_password(value, "long-enough-test-password")
     assert not check_admin_password(value, "wrong")
@@ -25,7 +25,7 @@ def test_password_hash_and_legacy_hash_compatibility():
 def test_installer_contract_and_small_trailer_validation(tmp_path):
     bundle = {"kind": "agent", "url": "https://gateway.example:2222", "token": "temporary-fixture"}
     raw = json.dumps(bundle).encode()
-    target = tmp_path / "EdgeHub.exe"
+    target = tmp_path / "O3CloudCentral.exe"
     target.write_bytes(b"MZ-frozen-python-fixture" + raw + struct.pack("<Q8s", len(raw), INSTALLER_MAGIC))
     assert embedded_bundle(target) == bundle
     target.write_bytes(b"MZ")

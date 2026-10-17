@@ -9,8 +9,8 @@ import tarfile
 import pytest
 
 from test_central import AUTH, gateway_enroll, lab, new_service, new_site, post
-from edgehub.central import digest
-from edgehub.linux_artifacts import bootstrap_command, installer_prefix, LINUX_ARTIFACT
+from o3cloudcentral.central import digest
+from o3cloudcentral.linux_artifacts import bootstrap_command, installer_prefix, LINUX_ARTIFACT
 from test_central_reusable_links import relay, payload
 
 

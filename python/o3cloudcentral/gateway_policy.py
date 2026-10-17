@@ -124,7 +124,7 @@ def validate_snapshot(snapshot: dict) -> None:
 def atomic_json(path: str, value: object) -> None:
     target = Path(path)
     target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix=".edgehub-", dir=target.parent)
+    descriptor, temporary = tempfile.mkstemp(prefix=".o3cloudcentral-", dir=target.parent)
     try:
         os.chmod(temporary, 0o600)
         with os.fdopen(descriptor, "wb") as handle:

@@ -8,17 +8,17 @@ import subprocess
 
 import pytest
 
-from edgehub.central_artifacts import pfsense_command
+from o3cloudcentral.central_artifacts import pfsense_command
 
 
 @pytest.mark.skipif(os.name == "nt" or not shutil.which("sh"), reason="Isolated POSIX shell fixture")
 @pytest.mark.parametrize("scenario", ["busy", "existing-config", "dangling-config", "failed-download"])
 def test_fresh_install_lock_and_failure_leave_no_partial_identity(tmp_path, scenario):
     root = tmp_path / "fixture"
-    for name in ("bin", "var/run", "tmp", "usr/local/etc/edgehub"):
+    for name in ("bin", "var/run", "tmp", "usr/local/etc/o3cloudcentral"):
         (root / name).mkdir(parents=True, exist_ok=True)
-    lock = root / "var/run/edgehub-update.lock"
-    config = root / "usr/local/etc/edgehub/config.json"
+    lock = root / "var/run/o3cloudcentral-update.lock"
+    config = root / "usr/local/etc/o3cloudcentral/config.json"
     events = root / "events"
     if scenario == "busy":
         lock.mkdir()
@@ -42,14 +42,14 @@ def test_fresh_install_lock_and_failure_leave_no_partial_identity(tmp_path, scen
     script = shlex.split(pfsense_command(bundle, hashlib.sha256(b"fixture").hexdigest()))[2]
     for source in ("/usr/local/", "/var/run/"):
         script = script.replace(source, str(root) + source)
-    script = script.replace("/tmp/edgehub-install.", str(root / "tmp/edgehub-install."))
+    script = script.replace("/tmp/o3cloudcentral-install.", str(root / "tmp/o3cloudcentral-install."))
     target = root / "install.sh"
     target.write_text(script)
     result = subprocess.run([shutil.which("sh"), str(target)], capture_output=True, text=True, timeout=10,
                             env={**os.environ, "PATH": str(root / "bin") + ":/usr/bin:/bin", "O3_EVENTS": str(events)})
     assert result.returncode != 0
     assert lock.exists() == (scenario == "busy")
-    assert not list((root / "tmp").glob("edgehub-install.*"))
+    assert not list((root / "tmp").glob("o3cloudcentral-install.*"))
     assert (events.read_text() if events.exists() else "") == ("fetch\n" if scenario == "failed-download" else "")
     if scenario == "existing-config":
         assert config.read_text() == "preserve-existing-identity"

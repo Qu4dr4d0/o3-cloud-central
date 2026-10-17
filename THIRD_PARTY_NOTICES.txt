@@ -1,4 +1,4 @@
-O3 Cloud Central Python 0.6.6
+O3 Cloud Central Python 0.7.0
 
 The Python release includes third-party license texts in third-party/python/,
 third-party/Python/ and, when available from the verified dependency cache,

@@ -28,7 +28,7 @@ def must_change_password(state, username):
 
 
 def csrf(request):
-    if request.headers.get('x-edgehub-request') != '1':
+    if request.headers.get('x-o3cloudcentral-request') != '1':
         raise APIError(403, 'cabeçalho de segurança obrigatório')
     origin = request.headers.get('origin', '')
     if origin and origin != 'https://' + request.headers.get('host', ''):

@@ -8,7 +8,7 @@ import pytest
 
 from test_central import (AUTH, agent_enroll, gateway_enroll, lab, new_device,
                           new_service, new_site, post, public_key)
-from edgehub.central import digest, now, stamp
+from o3cloudcentral.central import digest, now, stamp
 
 
 def make_link(client, site, services):
@@ -16,7 +16,7 @@ def make_link(client, site, services):
 
 
 def relay(gateway):
-    return {"X-EdgeHub-Gateway": "1", "Authorization": "Bearer " + gateway["token"]}
+    return {"X-O3CloudCentral-Gateway": "1", "Authorization": "Bearer " + gateway["token"]}
 
 
 def payload(token, key=None, hostname="CAIXA-IGUAL"):
@@ -52,7 +52,7 @@ def test_firewall_device_capacity_rolls_back_reusable_enrollment(lab):
 
 @pytest.mark.parametrize("legacy", [False, True])
 def test_firewall_policy_size_rolls_back_ticket_identity_and_counter(lab, monkeypatch, legacy):
-    import edgehub.central as central
+    import o3cloudcentral.central as central
     client, repository, _ = lab
     site, service, _, gateway, _, token = setup(client)
     if legacy:
@@ -133,7 +133,7 @@ def test_wrong_firewall_or_direct_central_cannot_use_reusable_link(lab):
     other = new_site(client, "Other", "other.example:2222")
     other_gateway = gateway_enroll(client, other)
     before = repository.read()
-    for headers in ({}, relay(other_gateway), {"X-EdgeHub-Gateway": "1", "Authorization": "Bearer invalid"}):
+    for headers in ({}, relay(other_gateway), {"X-O3CloudCentral-Gateway": "1", "Authorization": "Bearer invalid"}):
         assert client.get(f"/install/windows/{token}", headers=headers).status_code == 403
         assert client.get(f"/install/windows/{token}/installer.exe", headers=headers).status_code == 403
         assert client.post("/api/enroll", json=payload(token), headers=headers).status_code == 403
@@ -236,7 +236,7 @@ def test_legacy_single_use_enrollment_is_preserved_and_cannot_replay_key(lab):
 
 
 def test_enrollment_also_reserves_space_for_persistent_firewall_cache(lab, monkeypatch):
-    import edgehub.central as central_module
+    import o3cloudcentral.central as central_module
     client, repository, _ = lab
     _, _, _, gateway, _, token = setup(client)
     original_snapshot = central_module.desired_snapshot

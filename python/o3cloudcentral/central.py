@@ -191,7 +191,7 @@ def _device_id(state: dict, request: Request) -> str:
 
 
 def _proxy_scope(state: dict, request: Request) -> tuple[str, bool]:
-    marker = request.headers.get("x-edgehub-gateway")
+    marker = request.headers.get("x-o3cloudcentral-gateway")
     if marker is None:
         return "", False
     gateway_id = _gateway_id(state, request)
@@ -209,7 +209,7 @@ def _default_report() -> dict:
 
 
 class Central:
-    def __init__(self, repository: Any, data_dir: Path, *, artifacts: dict | None = None, version: str = "0.6.6"):
+    def __init__(self, repository: Any, data_dir: Path, *, artifacts: dict | None = None, version: str = "0.7.0"):
         self.repo = repository
         self.data_dir = Path(data_dir)
         self.ca = (self.data_dir / "ca.crt").read_text(encoding="utf-8")
@@ -348,7 +348,7 @@ class Central:
         try:
             host, port = split_endpoint(address)
             async with asyncio.timeout(3):
-                conn = await asyncssh.connect(host, port, username="__edgehub_health__", client_factory=CheckClient, known_hosts=(), client_keys=[], agent_path=None, config=None, preferred_auth="none")
+                conn = await asyncssh.connect(host, port, username="__o3cloudcentral_health__", client_factory=CheckClient, known_hosts=(), client_keys=[], agent_path=None, config=None, preferred_auth="none")
                 conn.close()
                 await conn.wait_closed()
         except asyncssh.PermissionDenied:
@@ -469,7 +469,7 @@ class Central:
         return {"kind": "agent", "url": gateway_portal_url(site), "ca": self.ca, "token": token}, device, ticket
 
 
-def create_app(repository: Any, data_dir: Path | str, *, artifacts: dict | None = None, version: str = "0.6.6", monitor: bool = True) -> FastAPI:
+def create_app(repository: Any, data_dir: Path | str, *, artifacts: dict | None = None, version: str = "0.7.0", monitor: bool = True) -> FastAPI:
     central = Central(repository, Path(data_dir), artifacts=artifacts, version=version)
 
     @asynccontextmanager

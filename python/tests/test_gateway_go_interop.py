@@ -9,7 +9,7 @@ import shutil
 import pytest
 
 from test_gateway_runtime import Lab
-from edgehub.gateway_policy import snapshot_revision
+from o3cloudcentral.gateway_policy import snapshot_revision
 
 
 GO_CLIENT = r'''
@@ -23,10 +23,10 @@ func main(){
  keyraw,e:=os.ReadFile(os.Args[2]);if e!=nil{panic(e)};key,e:=ssh.ParsePrivateKey(keyraw);if e!=nil{panic(e)}
  expected,e:=os.ReadFile(os.Args[3]);if e!=nil{panic(e)};host,_,_,_,e:=ssh.ParseAuthorizedKey(expected);if e!=nil{panic(e)}
  c,e:=ssh.Dial("tcp",os.Args[1],&ssh.ClientConfig{User:"terminal-one",Auth:[]ssh.AuthMethod{ssh.PublicKeys(key)},HostKeyCallback:ssh.FixedHostKey(host),Timeout:5*time.Second});if e!=nil{panic(e)};defer c.Close()
- ok,raw,e:=c.SendRequest("policy-v1@edgehub",true,nil);if e!=nil||!ok{panic("policy")};var p struct{Control int `json:"control_version"`;Services []Service `json:"services"`};if json.Unmarshal(raw,&p)!=nil||p.Control!=1||len(p.Services)!=1{panic("policy json")}
- info:=[]byte(`{"hostname":"LEGACY-GO","local_ip":"192.168.10.25","agent_version":"0.4.0-lab","os":"windows"}`);ok,_,e=c.SendRequest("identity-v1@edgehub",true,info);if e!=nil||!ok{panic("identity")}
+ ok,raw,e:=c.SendRequest("policy-v1@o3cloudcentral",true,nil);if e!=nil||!ok{panic("policy")};var p struct{Control int `json:"control_version"`;Services []Service `json:"services"`};if json.Unmarshal(raw,&p)!=nil||p.Control!=1||len(p.Services)!=1{panic("policy json")}
+ info:=[]byte(`{"hostname":"LEGACY-GO","local_ip":"192.168.10.25","agent_version":"0.4.0-lab","os":"windows"}`);ok,_,e=c.SendRequest("identity-v1@o3cloudcentral",true,info);if e!=nil||!ok{panic("identity")}
  conn,e:=c.Dial("tcp",net.JoinHostPort(p.Services[0].Target,fmt.Sprint(p.Services[0].Port)));if e!=nil{panic(e)};defer conn.Close();conn.SetDeadline(time.Now().Add(5*time.Second));conn.Write([]byte("compat"));b:=make([]byte,6);if _,e=io.ReadFull(conn,b);e!=nil||string(b)!="compat"{panic("relay")}
- ok,_,e=c.SendRequest("identity-v1@edgehub",true,[]byte(`{"id":"other","hostname":"spoof"}`));if e!=nil||ok{panic("spoof accepted")}
+ ok,_,e=c.SendRequest("identity-v1@o3cloudcentral",true,[]byte(`{"id":"other","hostname":"spoof"}`));if e!=nil||ok{panic("spoof accepted")}
  if session,e:=c.NewSession();e==nil{session.Close();panic("session allowed")};fmt.Print("legacy-go-ok")
 }
 '''
@@ -34,10 +34,10 @@ func main(){
 
 @pytest.fixture(scope="module")
 def legacy_client(tmp_path_factory):
-    go = os.environ.get("EDGEHUB_GO") or shutil.which("go")
+    go = os.environ.get("O3CLOUDCENTRAL_GO") or shutil.which("go")
     root = Path(__file__).resolve().parents[2]
     if not go:
-        candidate = root.parent / ".edgehub-tools/go/bin/go.exe"
+        candidate = root.parent / ".o3cloudcentral-tools/go/bin/go.exe"
         go = str(candidate) if candidate.exists() else None
     if not go or not (root / "go.mod").exists():
         pytest.skip("Optional legacy comparison requires the original Go reference tree")

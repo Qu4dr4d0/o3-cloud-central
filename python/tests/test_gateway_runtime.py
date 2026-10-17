@@ -22,9 +22,9 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID
 import pytest
 
-from edgehub.gateway import Gateway, normalize_identity
-from edgehub.gateway_policy import snapshot_revision, validate_snapshot, store_policy, load_policy
-from edgehub.gateway_portal import portal_route, private_client_context
+from o3cloudcentral.gateway import Gateway, normalize_identity
+from o3cloudcentral.gateway_policy import snapshot_revision, validate_snapshot, store_policy, load_policy
+from o3cloudcentral.gateway_portal import portal_route, private_client_context
 from test_central_tls import bridge
 
 
@@ -92,13 +92,13 @@ class Lab:
             if self.revoked:
                 return web.Response(status=403)
             return web.json_response(self.snapshot, status=self.central_status)
-        assert request.headers.get("X-EdgeHub-Gateway") == "1"
+        assert request.headers.get("X-O3CloudCentral-Gateway") == "1"
         if self.redirect:
             return web.Response(status=302, headers={"Location": "https://secret.private/"})
         if request.path == "/api/enroll":
             return web.json_response({"ok": True, "received": await request.json()}, headers={"Set-Cookie": "secret=value"})
         if request.path.endswith("installer.exe"):
-            return web.Response(body=b"MZ" + b"x" * 100000, content_type="application/octet-stream", headers={"Content-Disposition": 'attachment; filename="EdgeHub.exe"'})
+            return web.Response(body=b"MZ" + b"x" * 100000, content_type="application/octet-stream", headers={"Content-Disposition": 'attachment; filename="O3CloudCentral.exe"'})
         return web.Response(text="<html>Install</html>", content_type="text/html")
 
     async def echo(self, reader, writer):
@@ -133,12 +133,12 @@ async def lab(tmp_path):
 @pytest.mark.asyncio
 async def test_same_port_ssh_https_policy_identity_and_denials(lab):
     async with await lab.connect() as connection:
-        result, packet = await connection._make_global_request("policy-v1@edgehub")
+        result, packet = await connection._make_global_request("policy-v1@o3cloudcentral")
         assert result == MSG_REQUEST_SUCCESS
         policy = json.loads(packet.get_remaining_payload())
         assert policy["control_version"] == 1 and policy["services"][0]["id"] == "echo"
         identity = {"hostname": "CAIXA-02", "local_ip": "192.168.5.14", "agent_version": "0.4.0-lab", "os": "windows"}
-        result, _ = await connection._make_global_request("identity-v1@edgehub", json.dumps(identity).encode())
+        result, _ = await connection._make_global_request("identity-v1@o3cloudcentral", json.dumps(identity).encode())
         assert result == MSG_REQUEST_SUCCESS
         reader, writer = await connection.open_connection("127.0.0.1", lab.target_port)
         writer.write(b"hello")
@@ -274,7 +274,7 @@ def test_portal_route_exact_whitelist():
 
 @pytest.mark.asyncio
 async def test_python_agent_uses_only_gateway_and_reports_telemetry(lab, tmp_path):
-    from edgehub.agent import run_agent, AgentControl
+    from o3cloudcentral.agent import run_agent, AgentControl
     # The central address is intentionally unusable to this terminal. Initial
     # enrollment is complete, so every runtime operation must use the gateway.
     local_port = free_port()
@@ -308,7 +308,7 @@ async def test_python_agent_uses_only_gateway_and_reports_telemetry(lab, tmp_pat
             await asyncio.sleep(0.01)
         identity = lab.gateway.report()["terminals"]["terminal-one"]
         assert identity["hostname"] == socket.gethostname()
-        from edgehub import __version__
+        from o3cloudcentral import __version__
         assert identity["agent_version"] == __version__
         await lab.gateway.sync()
         assert lab.reports[-1]["terminals"]["terminal-one"]["hostname"] == socket.gethostname()
@@ -324,7 +324,7 @@ async def test_failed_cache_write_never_authorizes_new_permissions(lab, monkeypa
     lab.snapshot["revision"] = snapshot_revision(lab.snapshot)
     def failed_write(*args):
         raise OSError("disk full")
-    monkeypatch.setattr("edgehub.gateway.store_policy", failed_write)
+    monkeypatch.setattr("o3cloudcentral.gateway.store_policy", failed_write)
     await lab.gateway.sync()
     assert lab.gateway.snapshot["revision"] == original
     assert not lab.gateway.target_allowed("terminal-one", "127.0.0.1", lab.target_port + 1)

@@ -1,6 +1,6 @@
 'use strict';
 (()=>{
- const key='edgehub-theme',root=document.documentElement;
+ const key='o3cloudcentral-theme',root=document.documentElement;
  const system=window.matchMedia('(prefers-color-scheme: dark)');
  const valid=value=>value==='dark'||value==='light';
  let preference=null;

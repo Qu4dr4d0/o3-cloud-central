@@ -6,8 +6,8 @@ import time
 
 import pytest
 
-from edgehub.central import APIError
-from edgehub.log_security import InstallationTokenFilter, install_log_filters
+from o3cloudcentral.central import APIError
+from o3cloudcentral.log_security import InstallationTokenFilter, install_log_filters
 from test_central import lab
 from test_central_auth import accounts, login, HEADERS
 
@@ -62,7 +62,7 @@ async def test_password_workers_remain_bounded_when_request_cancelled(lab):
 @pytest.mark.asyncio
 async def test_slow_and_deep_json_requests_fail_with_client_errors(lab, monkeypatch):
     _, _, central = lab
-    import edgehub.central as core
+    import o3cloudcentral.central as core
     monkeypatch.setattr(core,'BODY_TIMEOUT',.01)
     class Slow:
         headers={'content-type':'application/json'}

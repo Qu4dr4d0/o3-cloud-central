@@ -83,7 +83,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
   await page.emulateMedia({colorScheme:'light'});assert.equal(await themeValue(),'dark');
   await page.screenshot({path:path.join(root,'dist/painel-escuro-desktop.png'),fullPage:true});
   await theme.click();await page.reload({waitUntil:'networkidle'});assert.equal(await themeValue(),'light');
-  await page.evaluate(()=>localStorage.removeItem('edgehub-theme'));
+  await page.evaluate(()=>localStorage.removeItem('o3cloudcentral-theme'));
   await page.emulateMedia({colorScheme:'dark'});await page.reload({waitUntil:'networkidle'});assert.equal(await themeValue(),'dark');
   await page.emulateMedia({colorScheme:'light'});await page.waitForFunction(()=>document.documentElement.dataset.theme==='light');
   const other=await page.context().newPage();await other.goto(page.url(),{waitUntil:'networkidle'});

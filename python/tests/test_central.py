@@ -15,9 +15,9 @@ import asyncssh
 import pytest
 from fastapi.testclient import TestClient
 
-from edgehub.central import create_app, digest, identity, now, stamp
-from edgehub.common import desired_snapshot
-from edgehub.central_artifacts import DEFAULT_PFSENSE_PACKAGE
+from o3cloudcentral.central import create_app, digest, identity, now, stamp
+from o3cloudcentral.common import desired_snapshot
+from o3cloudcentral.central_artifacts import DEFAULT_PFSENSE_PACKAGE
 
 
 class MemoryRepository:
@@ -43,7 +43,7 @@ def public_key():
 
 @pytest.fixture
 def lab(tmp_path, monkeypatch):
-    import edgehub.central as central
+    import o3cloudcentral.central as central
     monkeypatch.setattr(central, "check_admin_password", lambda hashed, password: hashed == "test-hash" and password == "fixture-password")
     (tmp_path / "ca.crt").write_text("fixture-ca")
     (tmp_path / "O3CloudCentral.exe").write_bytes(b"MZfixture-not-executable")
@@ -54,7 +54,7 @@ def lab(tmp_path, monkeypatch):
         yield client, repository, app.state.central
 
 
-AUTH = {"auth": ("admin", "fixture-password"), "headers": {"X-EdgeHub-Request": "1"}}
+AUTH = {"auth": ("admin", "fixture-password"), "headers": {"X-O3CloudCentral-Request": "1"}}
 
 
 def post(client, path, body):
@@ -84,7 +84,7 @@ def gateway_enroll(client, site):
 
 def agent_enroll(client, device, *, proxy=None, hostname="CAIXA-01"):
     bundle = post(client, f"/api/admin/devices/{device['id']}/bootstrap", {})
-    headers = {"X-EdgeHub-Gateway": "1", "Authorization": "Bearer " + proxy["token"]} if proxy else {}
+    headers = {"X-O3CloudCentral-Gateway": "1", "Authorization": "Bearer " + proxy["token"]} if proxy else {}
     response = client.post("/api/enroll", headers=headers, json={"token": bundle["token"], "kind": "agent", "public_key": public_key(), "hostname": hostname, "transport": "ssh-policy-v1"})
     return response, bundle
 
@@ -93,13 +93,13 @@ def test_auth_csrf_and_input_contract(lab):
     client, repository, _ = lab
     assert client.get("/api/admin/state").status_code == 401
     assert client.post("/api/admin/sites", json={}, auth=AUTH["auth"]).status_code == 403
-    assert client.post("/api/admin/sites", json={}, auth=AUTH["auth"], headers={"X-EdgeHub-Request": "1", "Origin": "https://evil.example"}).status_code == 403
+    assert client.post("/api/admin/sites", json={}, auth=AUTH["auth"], headers={"X-O3CloudCentral-Request": "1", "Origin": "https://evil.example"}).status_code == 403
     assert client.post("/api/admin/sites", content="{}", **AUTH).status_code == 415
     assert client.post("/api/admin/sites", json={"surprise": "field"}, **AUTH).status_code == 400
     assert client.post("/api/admin/sites", json={"name": "x", "endpoint": "vpn.example:2222", "listen": "10.20.0.20"}, **AUTH).status_code == 400
     assert client.post("/api/admin/sites", content=b'{"name":"x"}' + b" " * (128 << 10), headers={**AUTH["headers"], "Content-Type": "application/json"}, auth=AUTH["auth"]).status_code == 413
     assert not repository.read()["sites"]
-    assert client.get("/healthz").json()["version"] == "0.6.6"
+    assert client.get("/healthz").json()["version"] == "0.7.0"
     assert client.get("/api/admin/state", headers={"Authorization": "Basic " + __import__("base64").b64encode("não:senha".encode()).decode()}).status_code == 401
     assert client.post("/api/admin/sites", content=b'{"name":"\\ud800","endpoint":"vpn.example:2222"}', headers={**AUTH["headers"], "Content-Type": "application/json"}, auth=AUTH["auth"]).status_code == 400
 
@@ -148,7 +148,7 @@ def test_enrollment_one_use_and_gateway_scope(lab):
     assert digest(bundle["token"]) in repository.read()["tickets"]
     key = public_key()
     payload = {"token": bundle["token"], "kind": "agent", "public_key": key, "hostname": "PC-2", "transport": "ssh-policy-v1"}
-    proxy_headers = {"X-EdgeHub-Gateway": "1", "Authorization": "Bearer " + gateway2["token"]}
+    proxy_headers = {"X-O3CloudCentral-Gateway": "1", "Authorization": "Bearer " + gateway2["token"]}
     good = client.post("/api/enroll", json=payload, headers=proxy_headers)
     assert good.status_code == 200
     assert client.post("/api/enroll", json=payload, headers=proxy_headers).status_code == 403
@@ -202,8 +202,8 @@ def test_online_installer_and_ticket_cancellation(lab):
     link = post(client, f"/api/admin/devices/{device['id']}/install-link", {})
     assert link["url"].startswith("https://vpn.example:2222/install/windows/")
     token = link["url"].rsplit("/", 1)[-1]
-    headers = {"X-EdgeHub-Gateway": "1", "Authorization": "Bearer " + gateway["token"]}
-    wrong = {"X-EdgeHub-Gateway": "1", "Authorization": "Bearer " + other_gateway["token"]}
+    headers = {"X-O3CloudCentral-Gateway": "1", "Authorization": "Bearer " + gateway["token"]}
+    wrong = {"X-O3CloudCentral-Gateway": "1", "Authorization": "Bearer " + other_gateway["token"]}
     assert client.get(f"/install/windows/{token}", headers=wrong).status_code == 403
     page = client.get(f"/install/windows/{token}", headers=headers)
     assert page.status_code == 200 and "Baixar instalador" in page.text
@@ -213,7 +213,7 @@ def test_online_installer_and_ticket_cancellation(lab):
     assert response.status_code == 200
     assert 'filename="O3CloudCentral-setup.exe"' in response.headers["Content-Disposition"]
     payload = response.content
-    assert payload[-8:] == b"EHUB001!"
+    assert payload[-8:] == b"O3CC001!"
     length = struct.unpack("<Q", payload[-16:-8])[0]
     bundle = json.loads(payload[-16-length:-16])
     assert bundle["url"] == "https://vpn.example:2222" and bundle["token"] == token
@@ -282,12 +282,12 @@ def test_pinned_probe_checks_server_signature_and_listener(lab):
 
 def test_portal_csr_is_scoped_and_keeps_private_key_local(tmp_path):
     from cryptography import x509
-    from edgehub.crypto import initialize_pki, new_gateway_portal_csr, new_key
+    from o3cloudcentral.crypto import initialize_pki, new_gateway_portal_csr, new_key
     initialize_pki(tmp_path, ["central.example"])
     repository = MemoryRepository()
     repository.state["admin_hash"] = digest("test-password")
     app = create_app(repository, tmp_path, monitor=False)
-    auth = {"auth": ("admin", "test-password"), "headers": {"X-EdgeHub-Request": "1"}}
+    auth = {"auth": ("admin", "test-password"), "headers": {"X-O3CloudCentral-Request": "1"}}
     with TestClient(app, base_url="https://central.example") as client:
         site = client.post("/api/admin/sites", json={"name": "CSR client", "endpoint": "gateway.example:2222"}, **auth).json()
         bundle = client.post(f"/api/admin/sites/{site['id']}/bootstrap", json={}, **auth).json()
@@ -315,7 +315,7 @@ def test_password_rotation_and_initial_secret_cleanup(tmp_path):
     repository = MemoryRepository()
     repository.state["admin_hash"] = digest("test-password")
     app = create_app(repository, tmp_path, monitor=False)
-    auth = {"auth": ("admin", "test-password"), "headers": {"X-EdgeHub-Request": "1"}}
+    auth = {"auth": ("admin", "test-password"), "headers": {"X-O3CloudCentral-Request": "1"}}
     with TestClient(app, base_url="https://central.example") as client:
         bad = client.post("/api/admin/account/password", json={"current_password": "wrong-password", "new_password": "new-password-1234"}, **auth)
         assert bad.status_code == 400

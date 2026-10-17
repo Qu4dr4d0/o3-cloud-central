@@ -36,9 +36,9 @@ def parser():
     result.add_argument("--url", default="")
     result.add_argument("--names", default="localhost,127.0.0.1")
     result.add_argument("--config", default="config.json")
-    result.add_argument("--cache", default="/var/db/edgehub/policy.json")
+    result.add_argument("--cache", default="/var/db/o3cloudcentral/policy.json")
     result.add_argument("--bundle", default="")
-    result.add_argument("--database-url", default=os.environ.get("EDGEHUB_DATABASE_URL", ""))
+    result.add_argument("--database-url", default=os.environ.get("O3CLOUDCENTRAL_DATABASE_URL", ""))
     result.add_argument("--legacy", default="")
     result.add_argument("--dry-run", action="store_true")
     result.add_argument("--internal-only", type=boolean, nargs="?", const=True, default=False)
@@ -55,7 +55,7 @@ def parser():
 def resource_root() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys._MEIPASS)
-    configured = os.environ.get("EDGEHUB_RESOURCE_ROOT")
+    configured = os.environ.get("O3CLOUDCENTRAL_RESOURCE_ROOT")
     return Path(configured) if configured else Path(__file__).resolve().parents[2]
 
 
@@ -69,7 +69,7 @@ def emit(value, output=""):
 
 def open_repository(dsn: str, *, initialize=True):
     if not dsn:
-        raise ValueError("Configure EDGEHUB_DATABASE_URL com MariaDB/MySQL.")
+        raise ValueError("Configure O3CLOUDCENTRAL_DATABASE_URL com MariaDB/MySQL.")
     from .storage import StateRepository
     repository = StateRepository(dsn)
     try:

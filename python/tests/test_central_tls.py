@@ -11,10 +11,10 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.x509.oid import NameOID
 import pytest
 
-from edgehub.central_tls import (MAX_CLIENT_HELLO, client_hello_ed25519,
+from o3cloudcentral.central_tls import (MAX_CLIENT_HELLO, client_hello_ed25519,
                                 create_tls_contexts, make_uvicorn_server,
                                 select_tls_context)
-from edgehub.crypto import initialize_pki, read_ca
+from o3cloudcentral.crypto import initialize_pki, read_ca
 
 
 def record(payload):
@@ -91,7 +91,7 @@ def test_single_ecdsa_chain_requires_no_clienthello_peek(tmp_path):
 
 def test_uvicorn_listener_legacy_ca_and_modern_ca_both_validate(bridge, monkeypatch):
     import uvicorn
-    import edgehub.central_tls as tls
+    import o3cloudcentral.central_tls as tls
     folder, contexts = bridge
     selected = []
     select = tls.select_tls_context

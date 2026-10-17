@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "o3-cloud-central"
-version = "0.6.6"
+version = "0.7.0"
 description = "O3 Cloud Central: managed customer access with Python agents and MariaDB"
 requires-python = ">=3.11"
 dependencies = [
@@ -30,12 +30,11 @@ test = ["pytest==9.1.1", "pytest-asyncio==1.4.0"]
 build = ["pyinstaller==6.22.3"]
 
 [project.scripts]
-o3cloudcentral = "edgehub.cli:main"
-edgehub = "edgehub.cli:main"
+o3cloudcentral = "o3cloudcentral.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["python"]
-include = ["edgehub*"]
+include = ["o3cloudcentral*"]
 
 [tool.pytest.ini_options]
 testpaths = ["python/tests"]

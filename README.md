@@ -36,7 +36,7 @@ Baixe o instalador e execute, substituindo a URL:
 
 ```bash
 curl --fail --location --proto '=https' --proto-redir '=https' \
-  https://raw.githubusercontent.com/Qu4dr4d0/o3-cloud-central/v0.6.6/install.sh \
+  https://raw.githubusercontent.com/Qu4dr4d0/o3-cloud-central/v0.7.0/install.sh \
   -o /tmp/o3cloudcentral-install.sh
 sudo sh /tmp/o3cloudcentral-install.sh --url https://10.20.0.10:8443
 ```
@@ -130,6 +130,8 @@ Use na aplicação do terminal o endereço local exibido no painel, por exemplo 
 
 ## Atualizar, verificar e cuidar dos dados
 
+A transição para 0.7.0 muda banco, caminhos e protocolos dos agentes. Para uma instalação anterior, siga o [guia de migração](deploy/MIGRATION.md) ou use uma VM nova. Atualize ou reinstale também os agentes dos pfSenses e terminais.
+
 Para atualizar uma instalação criada por este instalador, baixe o `install.sh` da versão desejada e execute com a **mesma URL** e `--upgrade`. Os cadastros, senhas e a CA existente são preservados.
 
 ```bash
@@ -140,7 +142,7 @@ sudo journalctl -u o3cloudcentral -n 100 --no-pager
 
 Atualizar a central não instala silenciosamente uma nova versão nos firewalls ou terminais.
 
-Antes de uma mudança, mantenha backup consistente do banco `edgehub_python`, de `/var/lib/edgehub` (inclui a CA e identidades), `/etc/o3cloudcentral.env` e `/etc/o3cloudcentral-install.json`. Proteja e teste seus backups em ambiente separado. Perder a CA pode exigir reinstalar os agentes. O instalador não configura backup externo automático.
+Antes de uma mudança, mantenha backup consistente do banco `o3cloudcentral`, de `/var/lib/o3cloudcentral` (inclui a CA e identidades), `/etc/o3cloudcentral.env` e `/etc/o3cloudcentral-install.json`. Proteja e teste seus backups em ambiente separado. Perder a CA pode exigir reinstalar os agentes. O instalador não configura backup externo automático.
 
 Se a central ficar indisponível, o pfSense pode continuar operando com a política previamente recebida. Alterações e revogações pendentes dependem da comunicação com a central; para interromper imediatamente um cliente isolado, desative/remova o agente no próprio pfSense.
 
@@ -148,7 +150,7 @@ Consulte [instalação e recuperação](deploy/INSTALL.md) e [pacote pfSense](de
 
 ## Código e distribuição
 
-O código está em `python/edgehub`, a interface em `web` e os instaladores em `deploy`. O banco de produção é MariaDB; a camada SQL é compatível com MySQL. Não há SQLite ou arquivo JSON como banco alternativo.
+O código está em `python/o3cloudcentral`, a interface em `web` e os instaladores em `deploy`. O banco de produção é MariaDB; a camada SQL é compatível com MySQL. Não há SQLite ou arquivo JSON como banco alternativo.
 
 As releases incluem uma distribuição pronta para instalar. O repositório não inclui bancos, senhas, chaves privadas ou configurações de clientes. Para reproduzir os artefatos: [guia de build](deploy/BUILD.md). Dependências de terceiros e suas licenças estão em [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt).
 

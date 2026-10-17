@@ -1,1 +1,0 @@
-/var/log/edgehub.log _edgehub:_edgehub 600 5 1024 * JC /var/run/edgehub-supervisor.pid

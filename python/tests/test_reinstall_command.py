@@ -8,18 +8,18 @@ import subprocess
 
 import pytest
 
-from edgehub.central_artifacts import pfsense_command
+from o3cloudcentral.central_artifacts import pfsense_command
 
 
 @pytest.mark.skipif(os.name == 'nt' or not shutil.which('sh'), reason='POSIX fake-root lifecycle')
 @pytest.mark.parametrize('scenario', ['installed', 'removed', 'download-fails', 'sha-fails', 'cleanup-fails', 'busy', 'identity-race', 'lock-race', 'enroll-fails'])
 def test_replacement_download_cleanup_enrollment_and_races(tmp_path, scenario):
     root = tmp_path / 'root'
-    for name in ('bin', 'var/run', 'tmp', 'usr/local/etc/edgehub', 'usr/local/etc/rc.d', 'usr/local/sbin'):
+    for name in ('bin', 'var/run', 'tmp', 'usr/local/etc/o3cloudcentral', 'usr/local/etc/rc.d', 'usr/local/sbin'):
         (root/name).mkdir(parents=True, exist_ok=True)
-    config = root/'usr/local/etc/edgehub/config.json'
+    config = root/'usr/local/etc/o3cloudcentral/config.json'
     if scenario != 'removed': config.write_text('old-identity')
-    lock = root/'var/run/edgehub-update.lock'
+    lock = root/'var/run/o3cloudcentral-update.lock'
     if scenario == 'busy':
         lock.mkdir()
         (lock/'other-operation').touch()
@@ -36,14 +36,14 @@ def test_replacement_download_cleanup_enrollment_and_races(tmp_path, scenario):
     fake('sha256', '[ "$O3_CASE" != sha-fails ] || { echo invalid; exit 0; }; echo '+checksum)
     fake('tar', 'echo extract >> "$O3_ROOT/events"; cat "$O3_ROOT/helper-template"')
     executable(root/'helper-template', '''[ "$1" = --replace-client ] && [ "$2" = vps_target ] || exit 9
-mkdir "$O3_ROOT/var/run/edgehub-update.lock" || exit 1
+mkdir "$O3_ROOT/var/run/o3cloudcentral-update.lock" || exit 1
 echo cleanup >> "$O3_ROOT/events"
-if [ "$O3_CASE" = cleanup-fails ]; then rmdir "$O3_ROOT/var/run/edgehub-update.lock"; exit 1; fi
-rm -f "$O3_ROOT/usr/local/etc/edgehub/config.json"
-rmdir "$O3_ROOT/var/run/edgehub-update.lock"
+if [ "$O3_CASE" = cleanup-fails ]; then rmdir "$O3_ROOT/var/run/o3cloudcentral-update.lock"; exit 1; fi
+rm -f "$O3_ROOT/usr/local/etc/o3cloudcentral/config.json"
+rmdir "$O3_ROOT/var/run/o3cloudcentral-update.lock"
 case "$O3_CASE" in
- identity-race) printf other-new-identity > "$O3_ROOT/usr/local/etc/edgehub/config.json";;
- lock-race) mkdir "$O3_ROOT/var/run/edgehub-update.lock"; touch "$O3_ROOT/var/run/edgehub-update.lock/other-operation";;
+ identity-race) printf other-new-identity > "$O3_ROOT/usr/local/etc/o3cloudcentral/config.json";;
+ lock-race) mkdir "$O3_ROOT/var/run/o3cloudcentral-update.lock"; touch "$O3_ROOT/var/run/o3cloudcentral-update.lock/other-operation";;
 esac''')
     fake('pkg', '''echo "pkg $1" >> "$O3_ROOT/events"
 if [ "$1" = add ]; then
@@ -53,7 +53,7 @@ fi''')
     executable(root/'exe-template', '''[ "$1" = enroll ] || exit 1
 echo enroll >> "$O3_ROOT/events"
 [ "$O3_CASE" != enroll-fails ] || exit 1
-printf new-identity > "$O3_ROOT/usr/local/etc/edgehub/config.json"''')
+printf new-identity > "$O3_ROOT/usr/local/etc/o3cloudcentral/config.json"''')
     executable(root/'rc-template', 'echo "$1" >> "$O3_ROOT/events"')
     bundle = {'kind':'gateway','url':'https://central.example:8443','ca':'public-fixture','token':'T'*43,'listen':'0.0.0.0:2222'}
     script = shlex.split(pfsense_command(bundle, checksum, replace_site_id='vps_target'))[2]
@@ -61,13 +61,13 @@ printf new-identity > "$O3_ROOT/usr/local/etc/edgehub/config.json"''')
     # destinations and the temporary installation directory map to this root.
     for source in ('/usr/local/', '/var/run/'):
         script = script.replace(source, str(root)+source)
-    script = script.replace('/tmp/edgehub-install.', str(root/'tmp/edgehub-install.'))
+    script = script.replace('/tmp/o3cloudcentral-install.', str(root/'tmp/o3cloudcentral-install.'))
     target = root/'run.sh'
     target.write_text(script)
     result = subprocess.run([shutil.which('sh'), str(target)], env={**os.environ,'PATH':str(root/'bin')+':/usr/bin:/bin','O3_ROOT':str(root),'O3_CASE':scenario}, capture_output=True,text=True,timeout=10)
     calls = events.read_text().splitlines()
     assert calls[0] == 'download'
-    assert not list((root/'tmp').glob('edgehub-install.*'))
+    assert not list((root/'tmp').glob('o3cloudcentral-install.*'))
     assert lock.exists() == (scenario in {'busy','lock-race'})
     if scenario in {'installed','removed'}:
         assert result.returncode == 0, result.stderr

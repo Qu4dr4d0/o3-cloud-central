@@ -6,8 +6,8 @@ import shlex
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 
-from edgehub.central import ZERO_TIME, digest, now, stamp
-from edgehub.storage import validate_state
+from o3cloudcentral.central import ZERO_TIME, digest, now, stamp
+from o3cloudcentral.storage import validate_state
 from test_central import (AUTH, agent_enroll, gateway_enroll, lab, new_device,
                           new_service, new_site, post, public_key)
 from test_storage import repository
@@ -39,9 +39,9 @@ def test_reinstall_command_is_fresh_guarded_and_preserves_live_gateway(lab):
     result, bundle = reinstall(client, site)
     assert set(result) == {"command", "expires_at", "sha256", "platform"}
     assert result["platform"] == "FreeBSD 14 amd64" and result["sha256"] in result["command"]
-    assert '[ ! -e /usr/local/etc/edgehub/config.json ]' in result["command"]
+    assert '[ ! -e /usr/local/etc/o3cloudcentral/config.json ]' in result["command"]
     assert '--replace-client ' + site['id'] in result['command']
-    assert 'tar -xOf "$edge_tmp/package.pkg" /usr/local/sbin/edgehub-uninstall' in result['command']
+    assert 'tar -xOf "$edge_tmp/package.pkg" /usr/local/sbin/o3cloudcentral-uninstall' in result['command']
     assert result['command'].index('sha256 -q') < result['command'].index('tar -xOf') < result['command'].index('--replace-client') < result['command'].index('pkg add -f')
     assert " enroll --bundle " in result["command"]
     assert "configure-gateway" not in result["command"] and "edge_dirty=1" not in result["command"]
@@ -111,7 +111,7 @@ def test_reinstall_ticket_rejects_wrong_kind_proxy_and_expiry_without_mutation(l
     _, bundle = reinstall(client, site)
     before = repository.read()
     data = {"kind": "gateway", "token": bundle["token"], "public_key": public_key()}
-    relay = {"X-EdgeHub-Gateway": "1", "Authorization": "Bearer " + wrong_gateway["token"]}
+    relay = {"X-O3CloudCentral-Gateway": "1", "Authorization": "Bearer " + wrong_gateway["token"]}
     assert client.post("/api/enroll", json=data, headers=relay).status_code == 403
     assert client.get(f"/api/install/pfsense/{bundle['token']}/package", headers=relay).status_code == 403
     assert client.post("/api/enroll", json={**data, "kind": "agent"}).status_code == 403
@@ -185,9 +185,9 @@ def test_concurrent_reinstall_ticket_has_exactly_one_winning_gateway(lab):
 
 def test_reinstall_ticket_and_atomic_identity_rotation_persist_in_mariadb(repository, tmp_path):
     from fastapi.testclient import TestClient
-    from edgehub.central import create_app
-    from edgehub.central_artifacts import DEFAULT_PFSENSE_PACKAGE
-    from edgehub.storage import empty_state
+    from o3cloudcentral.central import create_app
+    from o3cloudcentral.central_artifacts import DEFAULT_PFSENSE_PACKAGE
+    from o3cloudcentral.storage import empty_state
     (tmp_path / "ca.crt").write_text("fixture-ca", encoding="utf-8")
     (tmp_path / DEFAULT_PFSENSE_PACKAGE).write_bytes(b"fixture-package")
     state = empty_state()

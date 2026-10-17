@@ -5,8 +5,8 @@ import json
 import tarfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.6.6"
-ARTIFACTS = ("O3CloudCentral.exe", "pfSense-pkg-O3CloudCentral-0.6.4.pkg", "O3CloudCentral-linux-amd64.tar.gz")
+VERSION = "0.7.0"
+ARTIFACTS = ("O3CloudCentral.exe", "pfSense-pkg-O3CloudCentral-0.7.0.pkg", "O3CloudCentral-linux-amd64.tar.gz")
 
 def main():
     dist = ROOT / "dist"
@@ -17,7 +17,7 @@ def main():
     (dist/"RELEASE.json").write_text(json.dumps({"version":VERSION,"artifacts":artifacts},indent=2)+"\n")
     allowed = {".gitignore",".gitattributes","README.md","pyproject.toml","requirements-python.txt",
                "requirements-central.lock","THIRD_PARTY_NOTICES.txt","install.sh"}
-    roots = ("python/edgehub","python/tests","web","assets","deploy","scripts")
+    roots = ("python/o3cloudcentral","python/tests","web","assets","deploy","scripts")
     paths = [ROOT/name for name in sorted(allowed)]
     for folder in roots:
         paths.extend(sorted(path for path in (ROOT/folder).rglob("*") if path.is_file()

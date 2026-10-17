@@ -9,13 +9,13 @@ O caminho recomendado está no [README](../README.md). Use uma VM Ubuntu dedicad
 | /opt/o3cloudcentral/releases | Código das versões instaladas |
 | /opt/o3cloudcentral/venvs | Ambientes Python separados por instalação |
 | /opt/o3cloudcentral/current e /opt/o3cloudcentral/venv | Links para a versão ativa |
-| /var/lib/edgehub | CA, identidade TLS e artefatos dos agentes; acesso restrito |
+| /var/lib/o3cloudcentral | CA, identidade TLS e artefatos dos agentes; acesso restrito |
 | /etc/o3cloudcentral.env | Configuração do serviço |
 | /etc/o3cloudcentral-install.json | Identificação da instalação, URL e etapas concluídas |
 | /etc/o3cloudcentral/ca.crt | Cópia pública da CA para confiar no navegador |
 | /etc/systemd/system/o3cloudcentral.service | Serviço da central |
 
-Os nomes internos `edgehub` são mantidos por compatibilidade. O serviço executa com usuário dedicado sem login; conecta ao MariaDB via socket Unix e autenticação do usuário local. Somente esse banco recebe permissões. Os arquivos de código pertencem ao root.
+Os nomes internos são padronizados como `o3cloudcentral`. O serviço executa com usuário dedicado sem login; conecta ao MariaDB via socket Unix e autenticação do usuário local. Somente esse banco recebe permissões. Os arquivos de código pertencem ao root.
 
 ## Distribuição local
 
@@ -23,8 +23,8 @@ Se a VM não puder baixar a release diretamente, transfira o arquivo da release 
 
 ```bash
 sha256sum --check SHA256SUMS --ignore-missing
-tar -xzf o3-cloud-central-0.6.6.tar.gz
-cd o3-cloud-central-0.6.6
+tar -xzf o3-cloud-central-0.7.0.tar.gz
+cd o3-cloud-central-0.7.0
 sudo python3 deploy/install-central.py --url https://10.20.0.10:8443
 ```
 

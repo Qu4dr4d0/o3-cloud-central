@@ -192,7 +192,11 @@ def test_update_rollback_against_fake_root(tmp_path, legacy_go, failure):
         assert (root / "registered").read_text() == "new-package"
         actions = [json.loads(line) for line in (root / "pkg-actions.jsonl").read_text().splitlines()]
         assert sum(action[0] == "add" for action in actions) == 1
-        assert sum(action[0] == "set" for action in actions) == 1
+        # Only the canonical package exists in 0.7.0. Renaming it to itself is
+        # invalid; recovery must preserve the new process without any rename.
+        # The assertions above still require unchanged identity/runtime/registry
+        # and exactly one package installation, with no restore or second start.
+        assert not any(action[0] == "set" for action in actions)
         assert not any(action[0] == "delete" for action in actions)
         backups = list((root / "var/tmp").glob("o3cloudcentral-rollback.*"))
         assert len(backups) == 1

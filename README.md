@@ -36,7 +36,7 @@ Baixe o instalador e execute, substituindo a URL:
 
 ```bash
 curl --fail --location --proto '=https' --proto-redir '=https' \
-  https://raw.githubusercontent.com/Qu4dr4d0/o3-cloud-central/v0.7.2/install.sh \
+  https://raw.githubusercontent.com/Qu4dr4d0/o3-cloud-central/v0.7.3/install.sh \
   -o /tmp/o3cloudcentral-install.sh
 sudo sh /tmp/o3cloudcentral-install.sh --url https://10.20.0.10:8443
 ```
@@ -83,6 +83,8 @@ No painel, clique em **Cadastrar cliente** e preencha:
 | Redes dos serviços | `172.30.20.0/24` | Redes em que os serviços deste cliente podem ser cadastrados |
 
 O endereço de escuta exige **IP e porta**. Ele não é o endereço da central.
+
+No lápis ao lado do endereço público, use **Editar cliente** para alterar o endereço e as **redes internas autorizadas**. Informe as redes com máscara, separadas por vírgula. Para retirar uma rede, remova antes os serviços que dependem dela ou mantenha outra rede que cubra os seus destinos.
 
 1. Copie o comando gerado e execute como root no console ou em **Diagnostics → Command Prompt** do pfSense.
 2. Use **pfSense CE 2.7.x, 2.8.x ou 2.9.x, amd64** (bases FreeBSD 14, 15 e 16). O mesmo comando atende essas versões; o runtime Python e as bibliotecas de compatibilidade ficam isolados, sem modificar os repositórios ou as bibliotecas do firewall.

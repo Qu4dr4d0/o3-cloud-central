@@ -136,6 +136,46 @@ def test_crud_cascade_and_revision_ack(lab):
     assert client.post("/api/gateway/sync", json={"sessions": {}, "services": [], "version": "fixture"}, headers={"Authorization": "Bearer " + gateway["token"]}).status_code == 403
 
 
+def test_edit_internal_networks_allows_new_service_only_for_selected_client(lab):
+    client, repository, _ = lab
+    site = post(client, "/api/admin/sites", {"name":"Editable", "endpoint":"vpn.example:2222", "cidrs":["172.30.20.0/24"]})
+    other = post(client, "/api/admin/sites", {"name":"Other", "endpoint":"other.example:2222", "cidrs":["172.30.20.0/24"]})
+    service = {"name":"Nginx", "target":"10.200.103.155", "port":80, "type":"HTTP"}
+    assert client.post(f"/api/admin/sites/{site['id']}/services", json=service, **AUTH).status_code == 400
+    response = client.patch(f"/api/admin/sites/{site['id']}", json={"cidrs":["10.200.103.153/29", "10.200.103.152/29", "fd00:1::123/64"]}, **AUTH)
+    assert response.status_code == 200, response.text
+    updated = repository.read()["sites"][site["id"]]
+    assert updated["cidrs"] == ["10.200.103.152/29", "fd00:1::/64"]
+    assert updated["automatic_targets"] is False
+    post(client, f"/api/admin/sites/{site['id']}/services", service)
+    assert client.post(f"/api/admin/sites/{other['id']}/services", json=service, **AUTH).status_code == 400
+    assert repository.read()["sites"][other["id"]]["cidrs"] == ["172.30.20.0/24"]
+
+
+@pytest.mark.parametrize("cidrs", [[], ["invalid"], ["10.0.0.0/33"], ["0.0.0.0/0"], ["::/0"], ["10.0.0.0/24"]*33, "10.0.0.0/24", [None]])
+def test_edit_rejects_invalid_networks_without_partial_address_change(lab, cidrs):
+    client, repository, _ = lab
+    site = new_site(client)
+    before = repository.read()
+    response = client.patch(f"/api/admin/sites/{site['id']}", json={"endpoint":"changed.example:2223", "cidrs":cidrs}, **AUTH)
+    assert response.status_code == 400
+    assert repository.read() == before
+
+
+def test_edit_networks_preserves_existing_services_and_manual_mode(lab):
+    client, repository, _ = lab
+    site = new_site(client)
+    service = new_service(client, site)
+    before = repository.read()
+    response = client.patch(f"/api/admin/sites/{site['id']}", json={"endpoint":"changed.example:2223", "cidrs":["10.200.103.152/29"]}, **AUTH)
+    assert response.status_code == 400 and service["name"] in response.text
+    assert repository.read() == before
+    networks = ["172.30.20.0/24", "10.200.103.152/29"]
+    assert client.patch(f"/api/admin/sites/{site['id']}", json={"cidrs":networks}, **AUTH).status_code == 200
+    assert client.delete(f"/api/admin/sites/{site['id']}/services/{service['id']}", **AUTH).status_code == 200
+    assert repository.read()["sites"][site["id"]]["cidrs"] == networks
+
+
 def test_enrollment_one_use_and_gateway_scope(lab):
     client, repository, _ = lab
     first, second = new_site(client), new_site(client, "Second", "vpn.example:2223")

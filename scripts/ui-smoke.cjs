@@ -3,7 +3,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 (async()=>{
  const root=path.resolve(__dirname,'..'),now=new Date().toISOString(),old='2025-01-01T00:00:00Z';
  const state={version:'Prévia de layout',now,sites:{
- lab:{id:'lab',name:'Cliente Laboratório',endpoint:'ddns.exemplo.com:2222',host_key:'fixture',last_seen:now,services:[{id:'web',name:'Nginx laboratório',target:'172.30.20.10',port:80,local_port:18080,protocol:'TCP'}],report:{sessions:{connected:1},services:[{id:'web',reachable:true,checked_at:now}]}},
+ lab:{cidrs:['172.30.20.0/24'],id:'lab',name:'Cliente Laboratório',endpoint:'ddns.exemplo.com:2222',host_key:'fixture',last_seen:now,services:[{id:'web',name:'Nginx laboratório',target:'172.30.20.10',port:80,local_port:18080,protocol:'TCP'}],report:{sessions:{connected:1},services:[{id:'web',reachable:true,checked_at:now}]}},
  fresh:{id:'fresh',name:'Cliente sem pfSense',endpoint:'novo.exemplo.com:2222',host_key:'',last_seen:old,services:[],report:{}},
  other:{id:'other',name:'Outro cliente',endpoint:'outro.exemplo.com:2222',host_key:'fixture',last_seen:old,services:[],report:{}}
  },devices:{
@@ -40,7 +40,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
     const body=JSON.parse(raw);res.setHeader('Content-Type','application/json');
     if(req.method==='PATCH'&&req.url==='/api/admin/sites/lab'){
      if(body.endpoint==='invalido'){res.writeHead(400);res.end('endereço inválido');return}
-     endpointBody=body;state.sites.lab.endpoint=body.endpoint;res.end('{"ok":true}');return;
+     endpointBody=body;state.sites.lab.endpoint=body.endpoint;state.sites.lab.cidrs=body.cidrs;res.end('{"ok":true}');return;
     }
     if(req.url==='/api/admin/sites/lab/install-link'){
      linkBody=body;generatedLinks++;const link={id:'lnk_fixture_'+generatedLinks,services:body.services,created_at:now,expires_at:null,installation_count:0};if(body.platform==='debian'){state.sites.lab.installation_links={windows:state.sites.lab.installation_link,debian:link}}else{state.sites.lab.installation_link=link}res.end(JSON.stringify({...link,url:'https://novo.exemplo.com:2223/install/windows/reusable-'+generatedLinks,...(body.platform==='debian'?{command:"/bin/sh -c 'echo linux-fixture'"}:{})}));return;
@@ -155,19 +155,23 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
   assert.equal(await page.locator('#gateway-install-identity-warning').isVisible(),true);
   await page.evaluate(()=>refresh());assert.equal(reinstallRequests,generatedBefore+2);
   await page.locator('#gateway-install-dialog').getByRole('button',{name:'Fechar',exact:true}).last().click();
-  await page.getByRole('button',{name:'Editar endereço público',exact:true}).click();
+  await page.getByRole('button',{name:'Editar cliente',exact:true}).click();
   const endpointForm=page.locator('#endpoint-form');
   assert.equal(await endpointForm.locator('[name="endpoint"]').inputValue(),'ddns.exemplo.com:2222');
+  assert.equal(await endpointForm.locator('[name="cidrs"]').inputValue(),'172.30.20.0/24');
+  await page.locator('#endpoint-dialog').screenshot({path:path.join(root,'dist/editar-cliente-redes.png')});
   await endpointForm.locator('[name="endpoint"]').fill('invalido');
-  await endpointForm.getByRole('button',{name:'Salvar endereço',exact:true}).click();
+  await endpointForm.getByRole('button',{name:'Salvar alterações',exact:true}).click();
   await endpointForm.locator('[data-form-error]').waitFor({state:'visible'});assert.equal(endpointBody,null);
   await endpointForm.locator('[name="endpoint"]').fill('novo.exemplo.com:2223');
+  await endpointForm.locator('[name="cidrs"]').fill('172.30.20.0/24, 192.168.20.0/24');
   await page.evaluate(()=>refresh());assert.equal(await endpointForm.locator('[name="endpoint"]').inputValue(),'novo.exemplo.com:2223');
-  await endpointForm.getByRole('button',{name:'Salvar endereço',exact:true}).click();
+  await endpointForm.getByRole('button',{name:'Salvar alterações',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('#client-endpoint').textContent==='novo.exemplo.com:2223');
-  assert.deepEqual(endpointBody,{endpoint:'novo.exemplo.com:2223'});
-  await page.getByRole('button',{name:'Editar endereço público',exact:true}).click();
+  assert.deepEqual(endpointBody,{endpoint:'novo.exemplo.com:2223',cidrs:['172.30.20.0/24','192.168.20.0/24']});
+  await page.getByRole('button',{name:'Editar cliente',exact:true}).click();
   assert.equal(await endpointForm.locator('[name="endpoint"]').inputValue(),'novo.exemplo.com:2223');
+  assert.equal(await endpointForm.locator('[name="cidrs"]').inputValue(),'172.30.20.0/24, 192.168.20.0/24');
   await endpointForm.getByRole('button',{name:'Cancelar',exact:true}).click();
   assert.equal(await page.locator('#devices tr').count(),2);
   assert.equal(await page.locator('#devices').getByText('Terminal removido').count(),0);
@@ -272,7 +276,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
   await page.locator('#copy-terminal-command').click();
   assert.equal(await page.evaluate(()=>window.fixtureCopied),"/bin/sh -c 'echo linux-fixture'");
   await page.locator('#terminal-link-dialog').getByRole('button',{name:'Fechar',exact:true}).last().click();
-  assert.equal(await page.locator('#terminal-install-command').inputValue(),'');
+  await page.waitForFunction(()=>document.querySelector('#terminal-install-command').value==='');
   await page.getByRole('button',{name:'Instalar terminais',exact:true}).click();
   assert.equal(await page.locator('#devices tr').count(),2);
   await df.getByRole('button',{name:'Cancelar',exact:true}).click();

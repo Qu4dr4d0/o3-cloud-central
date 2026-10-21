@@ -596,20 +596,42 @@ def create_app(repository: Any, data_dir: Path | str, *, artifacts: dict | None 
     @app.patch("/api/admin/sites/{site_id}")
     async def patch_site(site_id: str, request: Request):
         await central.admin(request)
-        data = await central.body(request, {"endpoint", "portal_url"})
+        data = await central.body(request, {"endpoint", "portal_url", "cidrs"})
         if not data:
-            raise APIError(400, "endereço inválido")
-        for field in data:
+            raise APIError(400, "informe os dados do cliente")
+        updates = {}
+        for field in ("endpoint", "portal_url"):
+            if field not in data:
+                continue
             value = _string(data, field)
             if field == "endpoint" and (len(value) > 320 or not valid_endpoint(value)) or field == "portal_url" and value and not _valid_portal_url(value):
                 raise APIError(400, "endereço inválido")
+            updates[field] = value.rstrip("/") if field == "portal_url" else value
+        if "cidrs" in data:
+            cidrs = _strings(data, "cidrs")
+            if not cidrs or len(cidrs) > 32:
+                raise APIError(400, "Informe entre 1 e 32 redes internas.")
+            try:
+                networks = [ipaddress.ip_network(value, strict=False) for value in cidrs]
+                if any(network.prefixlen == 0 for network in networks):
+                    raise ValueError
+            except ValueError:
+                raise APIError(400, "Rede interna inválida. Use o formato 192.168.10.0/24; redes /0 não são permitidas.") from None
+            updates.update(cidrs=list(dict.fromkeys(str(network) for network in networks)), automatic_targets=False)
         def change(state):
             site = state["sites"].get(site_id)
             if not site:
                 raise APIError(404, "cliente não encontrado")
-            site.update({k: v.rstrip("/") if k == "portal_url" else v for k, v in data.items()})
+            if "cidrs" in updates:
+                for service in site.get("services") or []:
+                    try:
+                        validate_service(service, updates["cidrs"])
+                    except ValueError:
+                        raise APIError(400, "As redes informadas não incluem o serviço " + service["name"] + " (" + service["target"] + "). Mantenha a rede desse serviço ou remova-o antes de alterar as redes.") from None
+            site.update(updates)
         await central.tx(change)
-        central.probes.pop(site_id, None)
+        if "endpoint" in updates or "portal_url" in updates:
+            central.probes.pop(site_id, None)
         return {"ok": True}
 
     @app.delete("/api/admin/sites/{site_id}")

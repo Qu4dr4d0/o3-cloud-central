@@ -216,8 +216,9 @@ bindForm('#endpoint-form',async f=>{
  if(!id||!state.sites[id])throw new Error('Selecione um cliente.');
  const endpoint=f.get('endpoint').trim();
  let hostnameChanged=false;try{hostnameChanged=new URL('https://'+endpoint).hostname!==new URL('https://'+state.sites[id].endpoint).hostname}catch{}
- await api('/sites/'+encodeURIComponent(id),{endpoint},'PATCH');
- return hostnameChanged?'Endereço público atualizado. Confira também o certificado do portal de instalação no pfSense para o novo DNS/IP.':'Endereço público atualizado.';
+ const cidrs=f.get('cidrs').split(',').map(value=>value.trim()).filter(Boolean);
+ await api('/sites/'+encodeURIComponent(id),{endpoint,cidrs},'PATCH');
+ return hostnameChanged?'Cliente atualizado. Confira também o certificado do portal de instalação no pfSense para o novo DNS/IP.':'Cliente atualizado.';
 });
 bindForm('#service-form',async f=>{if(!state.sites[selectedID])throw new Error('Selecione um cliente.');const s=await api('/sites/'+selectedID+'/services',{name:f.get('name'),target:f.get('target'),port:Number(f.get('port')),protocol:'TCP',type:f.get('type')});return 'Serviço cadastrado. Acesso no terminal: '+serviceAccess(s);});
 $('#device-form').addEventListener('submit',async event=>{
@@ -277,7 +278,7 @@ $('#add-service').addEventListener('click',()=>{lastPresetPort=presetPorts[$('#s
 $('#add-device').addEventListener('click',()=>{const site=state.sites[selectedID];if(site)openTerminalInstall(site)});
 $('#edit-endpoint').addEventListener('click',()=>{
  const site=state.sites[selectedID];if(!site)return;
- editingEndpointID=site.id;$('#endpoint-form').elements.endpoint.value=site.endpoint;openDialog('#endpoint-dialog');
+ editingEndpointID=site.id;const form=$('#endpoint-form');form.elements.endpoint.value=site.endpoint;form.elements.cidrs.value=(site.cidrs||[]).join(', ');openDialog('#endpoint-dialog');
 });
 $('#endpoint-dialog').addEventListener('close',()=>{editingEndpointID='';$('#endpoint-form').reset()});
 function closeAccountMenu(){$('#account-menu').hidden=true;$('#account-button').setAttribute('aria-expanded','false')}

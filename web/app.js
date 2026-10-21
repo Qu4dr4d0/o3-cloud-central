@@ -2,6 +2,7 @@
 let state={sites:{},devices:{}},selectedID='',optionsSite='',passwordChanged=false,pendingWanted=false;
 let snapshotFresh=false,snapshotReceivedAt=0,refreshPending=false,editingEndpointID='',removingClientID='',installingSiteID='',installLinkBusy=false;
 let gatewayCommandBusy=false;
+let terminalDownload=null;
 const $=s=>document.querySelector(s);
 function el(tag,text,cls){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n}
 function notify(text){$('#notice').textContent=text;$('#notice').hidden=false}
@@ -70,13 +71,15 @@ function terminalPlatform(){return $('#device-form').elements.platform.value}
 function platformLink(site,platform=terminalPlatform()){return site.installation_links?.[platform]??(platform==='windows'?site.installation_link:null)}
 function savePlatformLink(site,platform,link){site.installation_links={...(site.installation_links||{}),[platform]:link};if(platform==='windows')site.installation_link=link}
 function showTerminalInstallLink(name,result,reusable=false,platform='windows'){
- $('#terminal-link-title').textContent=platform==='debian'?'Instalação Debian/Ubuntu':'Link de instalação';
+ terminalDownload={token:new URL(result.url).pathname.split('/').pop(),platform};
+ $('#download-terminal-installer').disabled=false;$('#download-terminal-installer').textContent='Baixar instalador';
+ $('#terminal-link-title').textContent=platform==='debian'?'Instalação Debian/Ubuntu':'Instalação Windows';
  $('#terminal-install-name').textContent=name;
  $('#terminal-install-link').value=result.url;
  $('#terminal-install-command-box').hidden=!result.command;
  $('#terminal-install-command').value=result.command||'';
  $('#copy-terminal-command').hidden=!result.command;$('#copy-terminal-command').textContent='Copiar comando';
- $('#terminal-install-description').textContent=reusable?'Abra o mesmo link nas máquinas deste cliente para baixar e instalar o O3 Cloud Central.':'Abra este link na máquina do cliente para baixar e instalar o O3 Cloud Central. O link dá acesso somente ao cadastro deste terminal.';
+ $('#terminal-install-description').textContent=(reusable?'Baixe o instalador ou envie o link ao TI. As duas opções podem ser usadas em várias máquinas deste cliente.':'Baixe o instalador ou envie o link para instalar somente este terminal.')+(platform==='debian'?' Após baixar, execute: sudo sh O3CloudCentral-setup-debian.sh.':'');
  $('#terminal-install-expiry').textContent=reusable?'Válido até revogar · Várias máquinas':'Válido até '+new Date(result.expires_at).toLocaleString('pt-BR')+' · Uma máquina';
  $('#terminal-install-rules').textContent=reusable?'Cada máquina recebe seu próprio cadastro, com o hostname e os serviços escolhidos. Copie e guarde o link agora. Gerar um novo invalida o anterior para este sistema operacional; os terminais já instalados e o link do outro sistema continuam funcionando.':'Válido por 24 horas e para uma máquina. Gerar outro link ou instalador invalida o anterior. Cancelar o cadastro também cancela o link.';
  $('#copy-terminal-link').textContent='Copiar link';$('#terminal-link-error').hidden=true;openDialog('#terminal-link-dialog');
@@ -323,7 +326,17 @@ $('#copy-terminal-command').addEventListener('click',async()=>{
  try{await navigator.clipboard.writeText(field.value);$('#copy-terminal-command').textContent='Comando copiado'}
  catch{field.focus();field.select();$('#terminal-link-error').textContent='Comando selecionado: pressione Ctrl + C.';$('#terminal-link-error').hidden=false}
 });
-$('#terminal-link-dialog').addEventListener('close',()=>{$('#terminal-install-link').value='';$('#terminal-install-command').value=''});
+$('#download-terminal-installer').addEventListener('click',async()=>{
+ const current=terminalDownload,button=$('#download-terminal-installer');if(!current||button.disabled)return;
+ button.disabled=true;button.textContent='Baixando…';$('#terminal-link-error').hidden=true;
+ try{
+  const blob=await api('/installer-download',{token:current.token},'POST',true);
+  if(terminalDownload!==current)return;
+  download(blob,current.platform==='debian'?'O3CloudCentral-setup-debian.sh':'O3CloudCentral-setup.exe');
+ }catch(error){if(terminalDownload===current){$('#terminal-link-error').textContent=error.message;$('#terminal-link-error').hidden=false}}
+ finally{if(terminalDownload===current){button.disabled=false;button.textContent='Baixar instalador'}}
+});
+$('#terminal-link-dialog').addEventListener('close',()=>{terminalDownload=null;$('#terminal-install-link').value='';$('#terminal-install-command').value=''});
 
 function showLinuxCommands(device){
  $('#linux-commands-host').textContent=device.hostname||device.name||'Terminal Linux';

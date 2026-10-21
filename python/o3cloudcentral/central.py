@@ -830,6 +830,31 @@ def create_app(repository: Any, data_dir: Path | str, *, artifacts: dict | None 
             return {"command": pfsense_command(bundle, checksum, update=update, replace_site_id=site_id if reinstall else ""), "expires_at": expires, "sha256": checksum, "platform": PFSENSE_PLATFORM}
         return await central.tx(change)
 
+    @app.post("/api/admin/installer-download")
+    async def download_terminal_installer(request: Request):
+        await central.admin(request)
+        data = await central.body(request, {"token"})
+        token = _string(data, "token")
+        if not TOKEN_RE.fullmatch(token):
+            raise APIError(403, "Cadastro de instalação inválido.")
+        state = await central.read()
+        ticket = state["tickets"].get(digest(token), {})
+        site = {}
+        if ticket.get("kind") == "agent-link":
+            site = state["sites"].get(ticket.get("object_id"), {})
+            valid = bool(site and validate_selection(site, ticket.get("services") or []))
+        elif ticket.get("kind") == "agent":
+            device = state["devices"].get(ticket.get("object_id"), {})
+            site = state["sites"].get(device.get("site_id"), {})
+            valid = bool(site and device and not device.get("revoked") and not device.get("public_key") and validate_selection(site, device.get("services") or []))
+        else:
+            valid = False
+        platform = ticket.get("platform", "windows")
+        if not (valid and _ticket_active(ticket) and valid_url(gateway_portal_url(site)) and platform in ("windows", "debian")):
+            raise APIError(403, "Link expirado, revogado ou indisponível. Gere uma nova instalação.")
+        bundle = {"kind":"agent", "url":gateway_portal_url(site), "ca":central.ca, "token":token}
+        return await central.linux_installer_response(bundle) if platform == "debian" else await central.installer_response(bundle)
+
     @app.get("/api/install/pfsense/{token}/package")
     async def install_package(token: str, request: Request):
         central.rate(request)

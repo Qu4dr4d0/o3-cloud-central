@@ -190,3 +190,5 @@ nav[aria-label="Ações do painel"]{position:relative}
 @media(max-width:480px){.login-card{padding:24px}.login-page .brand strong{font-size:19px}#current-username{max-width:85px}}
 /* Commands remain readable on narrow screens. */
 .linux-command-row{display:grid;grid-template-columns:100px minmax(0,1fr) auto;align-items:center;gap:8px;margin:12px 0}.linux-command-row input{font-family:monospace;min-width:0}#linux-commands-dialog{width:min(740px,95vw)}@media(max-width:600px){.linux-command-row{grid-template-columns:1fr auto}.linux-command-row strong{grid-column:1/-1}}
+
+#terminal-link-dialog .form-actions{flex-wrap:wrap}

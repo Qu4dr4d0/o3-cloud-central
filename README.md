@@ -36,7 +36,7 @@ Baixe o instalador e execute, substituindo a URL:
 
 ```bash
 curl --fail --location --proto '=https' --proto-redir '=https' \
-  https://raw.githubusercontent.com/Qu4dr4d0/o3-cloud-central/v0.7.3/install.sh \
+  https://raw.githubusercontent.com/Qu4dr4d0/o3-cloud-central/v0.7.4/install.sh \
   -o /tmp/o3cloudcentral-install.sh
 sudo sh /tmp/o3cloudcentral-install.sh --url https://10.20.0.10:8443
 ```
@@ -98,7 +98,7 @@ Os comandos de instalação do pfSense são específicos para cada cliente. Nunc
 
 1. Cadastre os serviços do cliente: nome, IP interno, porta e tipo.
 2. Em **Terminais → Instalar terminais**, escolha **Windows** ou **Debian / Ubuntu** e os serviços permitidos.
-3. Gere e entregue o link ao TI do cliente. O mesmo link pode ser usado em várias máquinas.
+3. Gere a instalação e escolha **Baixar instalador** para salvar o arquivo pela própria central, ou **Copiar link** para enviá-lo ao TI. O instalador e o link reutilizáveis podem ser usados em várias máquinas; baixar o arquivo não invalida o link.
 4. Cada instalação gera uma identidade própria e aparece automaticamente na central, com hostname, IP local e sistema operacional. Não é necessário cadastrar cada terminal antes.
 5. Revogar o link impede novas instalações por ele; **Remover acesso** revoga uma máquina já instalada. São ações diferentes.
 

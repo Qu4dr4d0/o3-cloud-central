@@ -176,6 +176,50 @@ def test_edit_networks_preserves_existing_services_and_manual_mode(lab):
     assert repository.read()["sites"][site["id"]]["cidrs"] == networks
 
 
+@pytest.mark.parametrize("platform", ["windows", "debian"])
+def test_direct_installer_download_preserves_reusable_link(lab, tmp_path, platform):
+    import hashlib
+    from o3cloudcentral.common import embedded_bundle
+    from o3cloudcentral.linux_artifacts import installer_prefix
+    client, repository, central = lab
+    central.linux_installer.write_bytes(b"linux-payload-fixture")
+    site = new_site(client)
+    service = new_service(client, site)
+    result = post(client, f"/api/admin/sites/{site['id']}/install-link", {"services":[service['id']], "platform":platform})
+    token = result['url'].rsplit('/',1)[-1]
+    before = repository.read()
+    for _ in range(2):
+        response = client.post('/api/admin/installer-download', json={'token':token}, **AUTH)
+        assert response.status_code == 200, response.text
+        expected = {'kind':'agent','url':'https://'+site['endpoint'],'ca':'fixture-ca','token':token}
+        if platform == 'windows':
+            assert 'O3CloudCentral-setup.exe' in response.headers['content-disposition']
+            file = tmp_path/'download.exe';file.write_bytes(response.content)
+            assert embedded_bundle(file) == expected
+        else:
+            assert 'O3CloudCentral-setup-debian.sh' in response.headers['content-disposition']
+            payload = central.linux_installer.read_bytes()
+            assert response.content == installer_prefix(expected,hashlib.sha256(payload).hexdigest())+payload
+    assert repository.read() == before
+    assert client.post('/api/admin/installer-download', json={'token':token}).status_code == 401
+    assert client.post('/api/admin/installer-download', json={'token':token}, auth=AUTH['auth']).status_code == 403
+    assert client.request("DELETE", f"/api/admin/sites/{site['id']}/install-link", json={'platform':platform}, **AUTH).status_code == 200
+    assert client.post('/api/admin/installer-download', json={'token':token}, **AUTH).status_code == 403
+
+
+def test_direct_installer_rejects_gateway_tokens_and_installed_terminal(lab):
+    client, repository, _ = lab
+    site = new_site(client); service = new_service(client,site)
+    gateway = post(client,f"/api/admin/sites/{site['id']}/bootstrap",{})
+    assert client.post('/api/admin/installer-download',json={'token':gateway['token']},**AUTH).status_code == 403
+    device = new_device(client,site,service)
+    link = post(client,f"/api/admin/devices/{device['id']}/install-link",{})
+    token = link['url'].rsplit('/',1)[-1]
+    assert client.post('/api/admin/installer-download',json={'token':token},**AUTH).status_code == 200
+    repository.transaction(lambda state: state['devices'][device['id']].update(public_key=public_key()))
+    assert client.post('/api/admin/installer-download',json={'token':token},**AUTH).status_code == 403
+
+
 def test_enrollment_one_use_and_gateway_scope(lab):
     client, repository, _ = lab
     first, second = new_site(client), new_site(client, "Second", "vpn.example:2223")

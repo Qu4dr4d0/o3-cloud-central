@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "o3-cloud-central"
-version = "0.7.3"
+version = "0.7.4"
 description = "O3 Cloud Central: managed customer access with Python agents and MariaDB"
 requires-python = ">=3.11"
 dependencies = [

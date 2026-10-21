@@ -19,9 +19,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
         run: |
-          gh release download v0.7.3 --repo "$REPOSITORY" --pattern o3-cloud-central-0.7.3.tar.gz --dir /tmp
+          gh release download v0.7.4 --repo "$REPOSITORY" --pattern o3-cloud-central-0.7.4.tar.gz --dir /tmp
           mkdir native
-          tar -xzf /tmp/o3-cloud-central-0.7.3.tar.gz -C native --strip-components=1 o3-cloud-central-0.7.3/dist/pfSense-pkg-O3CloudCentral-0.7.2.pkg o3-cloud-central-0.7.3/scripts/probe-python-pfsense.py
+          tar -xzf /tmp/o3-cloud-central-0.7.4.tar.gz -C native --strip-components=1 o3-cloud-central-0.7.4/dist/pfSense-pkg-O3CloudCentral-0.7.2.pkg o3-cloud-central-0.7.4/scripts/probe-python-pfsense.py
       - name: Package admission and functional tests in a disposable VM
         uses: vmactions/freebsd-vm@445f0a8fcc447079fcd41d8cf46968af9484c7c5
         with:

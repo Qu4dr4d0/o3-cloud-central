@@ -17,6 +17,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
  state.sites.fresh.gateway_status={state:'pending',online:false};state.sites.other.gateway_status={state:'offline',online:false};
  state.sites.lab.policy_sync='applied';
  state.sites.lab.services[0].availability='accessible';state.devices.connected.online=true;
+ let installerDownloadBody=null;
  let terminalBody=null,serviceBody=null,passwordBody=null,clientBody=null,stateGets=0,failState=false,endpointBody=null,removedServices=0,removedClients=0,failClientDelete=false,linkBody=null,generatedLinks=0,revokedLinks=0,reinstallRequests=0,failReinstall=false;
  const server=http.createServer((req,res)=>{
   res.setHeader('Content-Security-Policy',"default-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
@@ -38,6 +39,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
   if(req.method==='POST'||req.method==='PATCH'){
    let raw='';req.on('data',b=>raw+=b);req.on('end',()=>{
     const body=JSON.parse(raw);res.setHeader('Content-Type','application/json');
+    if(req.url==='/api/admin/installer-download'){installerDownloadBody=body;res.setHeader('Content-Type','application/octet-stream');res.end('fixture-installer');return;}
     if(req.method==='PATCH'&&req.url==='/api/admin/sites/lab'){
      if(body.endpoint==='invalido'){res.writeHead(400);res.end('endereço inválido');return}
      endpointBody=body;state.sites.lab.endpoint=body.endpoint;state.sites.lab.cidrs=body.cidrs;res.end('{"ok":true}');return;
@@ -250,6 +252,9 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
   assert.match(await page.locator('#terminal-install-rules').textContent(),/invalida/i);
   await page.getByRole('button',{name:'Copiar link',exact:true}).click();
   assert.equal(await page.evaluate(()=>window.fixtureCopied),'https://novo.exemplo.com:2223/install/windows/reusable-1');
+  const [windowsDownload]=await Promise.all([page.waitForEvent('download'),page.locator('#download-terminal-installer').click()]);
+  assert.equal(windowsDownload.suggestedFilename(),'O3CloudCentral-setup.exe');
+  assert.deepEqual(installerDownloadBody,{token:'reusable-1'});
   await page.locator('#terminal-link-dialog').screenshot({path:path.join(root,'dist/link-reutilizavel.png')});
   await page.locator('#terminal-link-dialog').getByRole('button',{name:'Fechar',exact:true}).last().click();
   state.sites.lab.installation_link.installation_count=2;await page.reload({waitUntil:'networkidle'});
@@ -271,6 +276,9 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
   await df.getByRole('button',{name:'Gerar link',exact:true}).click();
   await page.locator('#terminal-link-dialog').waitFor({state:'visible'});
   assert.equal(linkBody.platform,'debian');
+  const [debianDownload]=await Promise.all([page.waitForEvent('download'),page.locator('#download-terminal-installer').click()]);
+  assert.equal(debianDownload.suggestedFilename(),'O3CloudCentral-setup-debian.sh');
+  assert.equal(generatedLinks,3);
   assert.equal(await page.locator('#terminal-install-command').inputValue(),"/bin/sh -c 'echo linux-fixture'");
   await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{window.fixtureCopied=value}}}));
   await page.locator('#copy-terminal-command').click();

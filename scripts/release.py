@@ -5,8 +5,8 @@ import json
 import tarfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.7.1"
-ARTIFACTS = ("O3CloudCentral.exe", "pfSense-pkg-O3CloudCentral-0.7.0.pkg", "O3CloudCentral-linux-amd64.tar.gz")
+VERSION = "0.7.2"
+ARTIFACTS = ("O3CloudCentral.exe", "pfSense-pkg-O3CloudCentral-0.7.2.pkg", "O3CloudCentral-linux-amd64.tar.gz")
 
 def main():
     dist = ROOT / "dist"

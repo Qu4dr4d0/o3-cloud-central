@@ -36,7 +36,7 @@ Baixe o instalador e execute, substituindo a URL:
 
 ```bash
 curl --fail --location --proto '=https' --proto-redir '=https' \
-  https://raw.githubusercontent.com/Qu4dr4d0/o3-cloud-central/v0.7.1/install.sh \
+  https://raw.githubusercontent.com/Qu4dr4d0/o3-cloud-central/v0.7.2/install.sh \
   -o /tmp/o3cloudcentral-install.sh
 sudo sh /tmp/o3cloudcentral-install.sh --url https://10.20.0.10:8443
 ```
@@ -85,7 +85,7 @@ No painel, clique em **Cadastrar cliente** e preencha:
 O endereço de escuta exige **IP e porta**. Ele não é o endereço da central.
 
 1. Copie o comando gerado e execute como root no console ou em **Diagnostics → Command Prompt** do pfSense.
-2. Use pfSense baseado em **FreeBSD 14, amd64**. Outras bases/arquiteturas não são suportadas por este pacote.
+2. Use **pfSense CE 2.7.x, 2.8.x ou 2.9.x, amd64** (bases FreeBSD 14, 15 e 16). O mesmo comando atende essas versões; o runtime Python e as bibliotecas de compatibilidade ficam isolados, sem modificar os repositórios ou as bibliotecas do firewall.
 3. Confira o estado no painel. No pfSense, há uma página em **Services → O3 Cloud Central**.
 4. Para remover, use **System → Package Manager → Installed Packages**, localize **O3 Cloud Central** e clique na lixeira. O pacote remove os seus processos, identidades e arquivos sem remover regras ou serviços administrativos que não pertençam a ele.
 5. Se precisar instalar o mesmo cliente novamente, use **Gerar nova instalação** no painel. O fluxo substitui a identidade antiga; leia a confirmação, pois terminais vinculados ao túnel anterior podem precisar de reinstalação.

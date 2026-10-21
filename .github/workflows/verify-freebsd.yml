@@ -1,0 +1,43 @@
+name: Verify private FreeBSD runtime
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ['14.0', '15.0']
+    steps:
+      - name: Download the published package and functional probe
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          gh release download v0.7.2 --repo "$REPOSITORY" --pattern o3-cloud-central-0.7.2.tar.gz --dir /tmp
+          mkdir native
+          tar -xzf /tmp/o3-cloud-central-0.7.2.tar.gz -C native --strip-components=1 o3-cloud-central-0.7.2/dist/pfSense-pkg-O3CloudCentral-0.7.2.pkg o3-cloud-central-0.7.2/scripts/probe-python-pfsense.py
+      - name: Package admission and functional tests in a disposable VM
+        uses: vmactions/freebsd-vm@445f0a8fcc447079fcd41d8cf46968af9484c7c5
+        with:
+          release: ${{ matrix.release }}
+          mem: 2048
+          cpu: 2
+          copyback: false
+          run: |
+            set -eu
+            uname -srm
+            # Generic FreeBSD lacks pfSense's package framework. Only disable
+            # lifecycle scripts in this disposable VM; ABI checks remain active.
+            pkg -o RUN_SCRIPTS=false add -f native/dist/pfSense-pkg-O3CloudCentral-0.7.2.pkg
+            test "$(stat -f %u /usr/local/sbin/o3cloudcentral)" = 0
+            /usr/local/sbin/o3cloudcentral --version
+            root=/usr/local/libexec/o3cloudcentral
+            env -i PATH=/sbin:/bin:/usr/sbin:/usr/bin HOME=/nonexistent PYTHONHOME="$root/runtime" PYTHONPATH="$root/app:$root/runtime/lib/site-packages" LD_LIBRARY_PATH="$root/runtime/lib" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 AIOHTTP_NO_EXTENSIONS=1 MULTIDICT_NO_EXTENSIONS=1 YARL_NO_EXTENSIONS=1 PROPCACHE_NO_EXTENSIONS=1 "$root/runtime/bin/python3.12" -B native/scripts/probe-python-pfsense.py
+            pkg -o RUN_SCRIPTS=false delete -fy pfSense-pkg-O3CloudCentral
+            test ! -e /usr/local/sbin/o3cloudcentral

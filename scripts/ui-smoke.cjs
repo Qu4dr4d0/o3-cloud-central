@@ -48,9 +48,9 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
     if(req.url==='/api/admin/sites'){clientBody=body;state.sites.automatic={id:'automatic',...body,services:[],host_key:'',last_seen:old,report:{}};res.end(JSON.stringify(state.sites.automatic));return}
     if(req.url==='/api/admin/sites/lab/reinstall-command'||req.url==='/api/admin/sites/fresh/reinstall-command'){
      reinstallRequests++;if(failReinstall){res.writeHead(503);res.end('Falha ao gerar comando de reinstalação.');return}
-     res.end(JSON.stringify({command:"/bin/sh -c 'echo fresh-install-fixture'",expires_at:new Date(Date.now()+900000).toISOString(),platform:'FreeBSD 14 amd64'}));return;
+     res.end(JSON.stringify({command:"/bin/sh -c 'echo fresh-install-fixture'",expires_at:new Date(Date.now()+900000).toISOString(),platform:'pfSense CE 2.7.x / 2.8.x / 2.9.x amd64'}));return;
     }
-    if(req.url==='/api/admin/sites/fresh/install-command'||req.url==='/api/admin/sites/automatic/install-command'){res.end(JSON.stringify({command:"/bin/sh -c 'echo fixture'",expires_at:new Date(Date.now()+900000).toISOString(),platform:'FreeBSD 14 amd64'}));return}
+    if(req.url==='/api/admin/sites/fresh/install-command'||req.url==='/api/admin/sites/automatic/install-command'){res.end(JSON.stringify({command:"/bin/sh -c 'echo fixture'",expires_at:new Date(Date.now()+900000).toISOString(),platform:'pfSense CE 2.7.x / 2.8.x / 2.9.x amd64'}));return}
     if(req.url==='/api/admin/devices/pending/install-link'){res.end(JSON.stringify({url:'https://novo.exemplo.com:2222/install/windows/fixture-token',expires_at:new Date(Date.now()+86400000).toISOString()}));return}
     if(req.url==='/api/admin/devices'){terminalBody=body;state.devices.created={id:'created',name:'Novo terminal (fixture)',...body,public_key:'',revoked:false,last_seen:old};res.end(JSON.stringify(state.devices.created));return}
     if(req.url==='/api/admin/sites/lab/services'){serviceBody=body;const svc={id:'db',...body,local_port:20000};state.sites.lab.services.push(svc);res.end(JSON.stringify(svc));return}

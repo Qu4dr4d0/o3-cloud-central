@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Build O3 Cloud Central's private pfSense runtime without changing its repos.
 
-Only official FreeBSD ABI-14 packages and SHA-256-pinned PyPI pure wheels are
-read. No third party installation scripts or package lifecycle hooks execute.
+Only official FreeBSD ABI-14 packages, the official compat14x library archive
+and SHA-256-pinned PyPI pure wheels are read. Dependency package hooks never run.
 Requires Python 3.14+ (tar zstd support), or an installed zstandard module.
 """
 from __future__ import annotations
@@ -21,10 +21,12 @@ import zipfile
 
 PROJECT = Path(__file__).resolve().parents[1]
 REPO = "https://pkg.freebsd.org/FreeBSD:14:amd64/quarterly/"
+COMPAT_REPO = "https://pkg.freebsd.org/FreeBSD:15:amd64/quarterly/"
+COMPAT_LIBRARIES = {"libcrypto.so.30", "libssl.so.30", "libmd.so.6", "libutil.so.9"}
 PACKAGES = ("python312", "py312-cryptography", "py312-cffi", "py312-pycparser", "expat", "gettext-runtime", "libffi", "mpdecimal", "readline")
 WHEELS = {"asyncssh": "2.24.1", "aiohttp": "3.14.5", "multidict": "7.1.0", "frozenlist": "1.8.0", "yarl": "1.25.1", "propcache": "0.5.4", "aiohappyeyeballs": "2.7.1", "aiosignal": "1.4.0", "attrs": "26.1.0", "idna": "3.20", "typing-extensions": "4.16.0", "httpx": "0.28.1", "httpcore": "1.0.9", "anyio": "4.15.1", "certifi": "2026.7.22", "h11": "0.16.0", "sniffio": "1.3.1"}
 ALPHABET = "ybndrfg8ejkmcpqxot1uwisza345h769"
-PFSENSE_PACKAGE_VERSION = "0.7.0"
+PFSENSE_PACKAGE_VERSION = "0.7.2"
 
 
 def file_hash(raw: bytes) -> str:
@@ -57,7 +59,7 @@ def check_catalog_digest(raw: bytes, digest: str):
 
 
 def download(url: str, cache: Path, expected_sha: str = "") -> bytes:
-    if not url.startswith((REPO, "https://pypi.org/", "https://files.pythonhosted.org/")):
+    if not url.startswith((REPO, COMPAT_REPO, "https://pypi.org/", "https://files.pythonhosted.org/")):
         raise ValueError("unapproved dependency origin")
     key = hashlib.sha256(url.encode()).hexdigest()
     path = cache / key
@@ -65,7 +67,7 @@ def download(url: str, cache: Path, expected_sha: str = "") -> bytes:
         raw = path.read_bytes()
     else:
         with urllib.request.urlopen(url, timeout=90) as response:
-            if not response.url.startswith((REPO, "https://pypi.org/", "https://files.pythonhosted.org/")):
+            if not response.url.startswith((REPO, COMPAT_REPO, "https://pypi.org/", "https://files.pythonhosted.org/")):
                 raise ValueError("dependency redirected to an unapproved origin")
             raw = response.read(100 << 20)
             if response.read(1):
@@ -188,8 +190,23 @@ def main():
             wheel = candidates[0]
             wheels.append({"name": name, "version": version, "filename": wheel["filename"], "url": wheel["url"], "sha256": wheel["digests"]["sha256"]})
         provenance = {"schema": 1, "abi": "FreeBSD:14:amd64", "python": "3.12", "isolation": "Private relocatable runtime; no package scripts, repository changes or system file replacement", "catalog_url": REPO + "packagesite.pkg", "catalog_sha256": file_hash(catalog), "freebsd_packages": records, "pure_wheels": wheels}
+    compatibility = previous.get("compatibility_package") if previous else None
+    if not compatibility:
+        catalog = download(COMPAT_REPO + "packagesite.pkg", args.cache)
+        with open_tar(catalog) as archive:
+            candidates = [record for record in map(json.loads, archive.extractfile("packagesite.yaml"))
+                          if record["name"] == "compat14x-amd64"]
+        if len(candidates) != 1:
+            raise ValueError("official compat14x-amd64 package not found")
+        compatibility = {key: candidates[0].get(key) for key in ("name", "version", "path", "sum", "arch", "origin")}
+        compatibility.update(repository=COMPAT_REPO, catalog_sha256=file_hash(catalog))
+    if (compatibility["name"] != "compat14x-amd64" or compatibility["repository"] != COMPAT_REPO
+            or compatibility["arch"] != "freebsd:15:x86:64"):
+        raise ValueError("unexpected compatibility library origin")
+    provenance["compatibility_package"] = compatibility
+    provenance["supported_freebsd_majors"] = [14, 15, 16]
     provenance["product"] = "O3 Cloud Central"
-    provenance["application_version"] = "0.7.0"
+    provenance["application_version"] = "0.7.2"
     provenance["package_version"] = PFSENSE_PACKAGE_VERSION
     with tarfile.open(args.output, "w:gz", format=tarfile.PAX_FORMAT) as output:
         bundle = Bundle(output)
@@ -206,6 +223,26 @@ def main():
                         data = regular_data(archive, member)
                         bundle.add(destination, data, 0o755 if destination.startswith("runtime/bin/") or ".so" in destination else 0o644)
             print(record["name"], record["version"], record["sha256"], flush=True)
+        # Copy only the official legacy shared libraries, never install the
+        # compatibility package, its scripts, libc, loader or 32-bit libraries.
+        raw = download(COMPAT_REPO + compatibility["path"], args.cache, compatibility.get("sha256", ""))
+        check_catalog_digest(raw, compatibility["sum"])
+        compatibility["sha256"] = file_hash(raw)
+        found = set()
+        with open_tar(raw) as archive:
+            for member in archive:
+                name = member.name.lstrip("/")
+                library = name.removeprefix("usr/local/lib/compat/")
+                if library in COMPAT_LIBRARIES and name == "usr/local/lib/compat/" + library:
+                    data = regular_data(archive, member)
+                    if data[:6] != b"\x7fELF\x02\x01" or int.from_bytes(data[18:20], "little") != 62:
+                        raise ValueError("compatibility library is not amd64 ELF")
+                    bundle.add("runtime/lib/" + library, data, 0o755)
+                    found.add(library)
+                elif name.startswith("usr/local/share/licenses/compat14x-amd64/") and member.isfile():
+                    bundle.add("runtime/licenses/" + name.removeprefix("usr/local/share/licenses/"), regular_data(archive, member))
+        if found != COMPAT_LIBRARIES:
+            raise ValueError("missing compatibility shared libraries")
         for wheel in wheels:
             raw = download(wheel["url"], args.cache, wheel["sha256"])
             with zipfile.ZipFile(io.BytesIO(raw)) as archive:
@@ -232,7 +269,8 @@ def stage_package(runtime_archive: Path, output_path: Path) -> dict:
         "comment": "O3 Cloud Central Python TCP access service",
         "desc": "Python SSH forwarding, terminal telemetry and HTTPS enrollment on one TCP port. Private runtime; pilot deployment package.",
         "maintainer": "o3cloudcentral@example.invalid", "www": "https://example.invalid/o3cloudcentral",
-        "prefix": "/usr/local", "arch": "FreeBSD:14:amd64", "files": {},
+        "prefix": "/usr/local", "abi": "FreeBSD:*:amd64", "arch": "freebsd:*:x86:64", "files": {},
+        "annotations": {"FreeBSD_version": "1400000"},
         "categories": ["net"],
         "scripts": native_package_scripts(),
     }
@@ -280,6 +318,7 @@ def native_package_scripts() -> dict[str, str]:
     cleanup = (PROJECT / "deploy/o3cloudcentral-uninstall.sh").read_text(encoding="utf-8")
     classifier = (PROJECT / "deploy/pfsense-native-remove.sh").read_text(encoding="utf-8")
     return {
+        "pre-install": guard + 'case "$(uname -s):$(uname -m):$(uname -r)" in FreeBSD:amd64:14.*|FreeBSD:amd64:15.*|FreeBSD:amd64:16.*) ;; *) echo "Requer pfSense CE 2.7.x, 2.8.x ou 2.9.x amd64." >&2; exit 1 ;; esac\n',
         "post-install": guard + framework + 'POST-INSTALL\n',
         "pre-deinstall": guard + framework + 'DEINSTALL\n',
         "post-deinstall": guard + framework + 'POST-DEINSTALL\n' +

@@ -270,8 +270,24 @@
     }
   ],
   "product": "O3 Cloud Central",
-  "application_version": "0.7.0",
-  "package_version": "0.7.0",
+  "application_version": "0.7.2",
+  "package_version": "0.7.2",
+  "compatibility_package": {
+    "name": "compat14x-amd64",
+    "version": "14.2.1402000.20251120_1",
+    "path": "All/Hashed/compat14x-amd64-14.2.1402000.20251120_1~2$8rtk7f91.pkg",
+    "sum": "2$8rtk7f9196dcajoi6s9f5b3b981zh6dskq1o9qh1x3fte5f9wt93yrtck4mw9iphtgxaj3gf6p44ys9t9rmirmxw4rmkcmz35p3xiad",
+    "arch": "freebsd:15:x86:64",
+    "origin": "misc/compat14x",
+    "repository": "https://pkg.freebsd.org/FreeBSD:15:amd64/quarterly/",
+    "catalog_sha256": "72477bc1c5e5a9aff530dfb99060df8021d34c6715b0376558eb856261265362",
+    "sha256": "5326b4956bb372113326ada671e26ea125e6383295677767ee2dcd36fa272830"
+  },
+  "supported_freebsd_majors": [
+    14,
+    15,
+    16
+  ],
   "files": {
     "runtime/bin/python3.12": "3a7cc8547d29bb0179950f1f8efd550a460f83af45d1895f78f8f52d6b363c04",
     "runtime/lib/libpython3.12.so": "601b475b327541bfb8ea4b36fd375b1ed80d331b3d9a751a4d88d3ccd84307ee",
@@ -1180,6 +1196,10 @@
     "runtime/licenses/readline-8.3.6/GPLv3": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
     "runtime/licenses/readline-8.3.6/LICENSE": "feb018c22cc4001bbeccc04db5569c5aeaec18f1ebbee51a52d56c251418e243",
     "runtime/licenses/readline-8.3.6/catalog.mk": "d796faef88806c611103d289185722eff34af7a1f3be3ae696631bb74ffd851d",
+    "runtime/lib/libcrypto.so.30": "b7be9521a9794f28a2948bda5975aa5b48a288cda70ffea73679e41ffe0443be",
+    "runtime/lib/libmd.so.6": "81a64590e802db2c489334bd554d6d7dae65c5ee51490c666f3571ec8545551c",
+    "runtime/lib/libssl.so.30": "fa19672b1e897749f48cd9b34bff0aa417888405bc2b51a0529c25859c30014f",
+    "runtime/lib/libutil.so.9": "4e6b911bb32845b1c1029d14dac56910682db07bc9f3de9409a9c465cce1bde5",
     "runtime/lib/site-packages/asyncssh/__init__.py": "8c8c1e34084f29e1202312af09f617ed092f27403383548f0a60277afa7b6298",
     "runtime/lib/site-packages/asyncssh/agent.py": "a650c954d925a44ecd5bfad73c3426fe7dc21477b22914a3b61796e76559ce98",
     "runtime/lib/site-packages/asyncssh/agent_unix.py": "5c3f55674c85c74ed8c7e3b9d327908a651bbb24a9adaf671bcef945d9e4d8b6",
@@ -1605,11 +1625,11 @@
     "runtime/lib/site-packages/sniffio-1.3.1.dist-info/WHEEL": "a2241587fe4f9d033413780f762cf4f5608d9b08870cc6867abfde96a0777283",
     "runtime/lib/site-packages/sniffio-1.3.1.dist-info/top_level.txt": "bfd5095c6b390b275d095780a979108963aba69e96b71e86791acfb7dfa38c78",
     "runtime/lib/site-packages/sniffio-1.3.1.dist-info/RECORD": "064c8055feff5a74960318c8fe7476aac7f738d2993eb450cf0f481cbaa9dfaa",
-    "app/o3cloudcentral/__init__.py": "6fcd3c4b5e5530d7bbe03160ef4eee498d98439ec5a9abeebf1ced13fc85cec8",
+    "app/o3cloudcentral/__init__.py": "3d2b9a1aa380465e940acc1682e623df72f434c19cea2f7838b8cc40dbae8a29",
     "app/o3cloudcentral/__main__.py": "95acb39cf2eb401e2282cf116f2a72f5207c3169b55456e1d24589cbac9bf1c3",
     "app/o3cloudcentral/agent.py": "f73078cacc1a92be7a2091298eab84ce12f57745d1e02329595eafcee908966c",
-    "app/o3cloudcentral/central.py": "3ae095c047be3d1a3fbf0be08cd4717b54f800d949045d28a89b481755fb763c",
-    "app/o3cloudcentral/central_artifacts.py": "4fce5de42510302bed5d1f23b381cf8feed7a84e455ffdb1b009faf393081f46",
+    "app/o3cloudcentral/central.py": "27fe17c94508091ef384bc91eeb5bca3cd18be0ba42f8c486e873cd6ee9e7f59",
+    "app/o3cloudcentral/central_artifacts.py": "a4db2b67a7604a1c0c27a406d843c20f5011ce66463eec28d3388242b12d656d",
     "app/o3cloudcentral/central_auth.py": "b81bbd7faaa63878f6544905abb39ad1d489b6722a0a2ae23fa4f7f93a2c5f47",
     "app/o3cloudcentral/central_tls.py": "989d900a87c5321558a8de763e1a6b2a802f273ffc11fe51137de9114b5d54b9",
     "app/o3cloudcentral/cli.py": "eed6495df76cae811c92a64500925a782f3611f1b13560a8a79ee8abb1fc9aca",
@@ -1631,5 +1651,5 @@
     "app/assets/O3CloudCentral.png": "d1a096d00bb393dad10a9b6958bad18f2cb09cb858311d8357d926de0d282ce2",
     "probe.py": "822506c4d8d3bc700b649c9ba3da5fd75c66091571cc0bfc0be2a2d3c1420bff"
   },
-  "bundle_sha256": "b0775b9e9c279196f7c23613a39fcccbc4b779dd50c4ffd8bba2a0485fdcc8fe"
+  "bundle_sha256": "f45f7786a1b393336e00a7a5030ed30a34458bc6eb7678e5d43c688d49aaceb4"
 }

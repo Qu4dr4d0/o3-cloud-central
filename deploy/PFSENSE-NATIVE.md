@@ -33,7 +33,9 @@ O helper universal de emergência permanece disponível para manutenção admini
 Uma instalação anterior ao 0.6.2 precisa receber o novo pacote para ter os menus e
 os hooks nativos; atualizar somente a central não modifica o firewall.
 
-Alvo validado: pfSense CE 2.7.2, FreeBSD 14, amd64.
+Compatibilidade: pfSense CE 2.7.x / 2.8.x / 2.9.x amd64, com bases FreeBSD 14, 15 e 16. O pacote declara ABI amd64 entre essas bases e mantém as bibliotecas legadas de OpenSSL, libutil e libmd no runtime privado; não instala pacotes de compatibilidade no sistema. O comando e o pre-install recusam outras bases e arquiteturas.
+
+Validação no firewall: runtime no pfSense CE 2.8.1 e testes funcionais no pfSense CE 2.9.0. O CI adicional verifica o pacote em FreeBSD 14.0 e 15.0. A versão CE 2.7.0 ainda requer validação em uma VM pfSense dessa versão; testar FreeBSD 14.0 não substitui esse teste específico.
 
 ## Nova instalação do mesmo cliente
 

@@ -22,9 +22,9 @@ def test_final_stage_contains_only_private_product_paths():
     with tarfile.open(stage, "r:gz") as archive:
         manifest = json.load(archive.extractfile("manifest.json"))
         assert manifest["name"] == "pfSense-pkg-O3CloudCentral"
-        assert manifest["version"] == "0.7.0"
+        assert manifest["version"] == "0.7.2"
         assert manifest['categories'] == ['net']
-        assert set(manifest['scripts']) == {'post-install', 'pre-deinstall', 'post-deinstall'}
+        assert set(manifest['scripts']) == {'pre-install', 'post-install', 'pre-deinstall', 'post-deinstall'}
         assert 'set -- --native-cleanup' in manifest['scripts']['post-deinstall']
         assert 'o3c_native_gui_removal || exit 0' in manifest['scripts']['post-deinstall']
         fixed = {"/usr/local/sbin/o3cloudcentral", "/usr/local/sbin/o3cloudcentral-uninstall", "/usr/local/etc/rc.d/o3cloudcentral.sh", "/usr/local/sbin/o3cloudcentral", "/usr/local/sbin/o3cloudcentral-uninstall", "/usr/local/etc/rc.d/o3cloudcentral.sh", "/usr/local/etc/newsyslog.conf.d/o3cloudcentral.conf", "/usr/local/share/licenses/o3cloudcentral/THIRD_PARTY_NOTICES.txt"}

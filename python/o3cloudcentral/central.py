@@ -32,7 +32,7 @@ from starlette.concurrency import run_in_threadpool
 
 from .common import desired_snapshot, gateway_portal_url, selected_services, valid_endpoint, valid_url, validate_selection, validate_service
 from .crypto import check_admin_password, hash_admin_password, issue_gateway_portal, valid_public_key
-from .central_artifacts import DEFAULT_PFSENSE_PACKAGE, bundle_bytes, checked_artifact, package_digest, pfsense_command, windows_installer_stream
+from .central_artifacts import DEFAULT_PFSENSE_PACKAGE, PFSENSE_PLATFORM, bundle_bytes, checked_artifact, package_digest, pfsense_command, windows_installer_stream
 from .linux_artifacts import LINUX_ARTIFACT, installer_prefix, installer_stream, bootstrap_command
 from .gateway_policy import validate_snapshot, wire_json
 
@@ -805,7 +805,7 @@ def create_app(repository: Any, data_dir: Path | str, *, artifacts: dict | None 
                 raise APIError(400, "cliente inexistente ou estado de instalação incompatível")
             ticket_kind = "gateway-reinstall" if reinstall else "gateway-update" if update else "gateway"
             bundle, expires = central.bundle(state, ticket_kind, site_id)
-            return {"command": pfsense_command(bundle, checksum, update=update, replace_site_id=site_id if reinstall else ""), "expires_at": expires, "sha256": checksum, "platform": "FreeBSD 14 amd64"}
+            return {"command": pfsense_command(bundle, checksum, update=update, replace_site_id=site_id if reinstall else ""), "expires_at": expires, "sha256": checksum, "platform": PFSENSE_PLATFORM}
         return await central.tx(change)
 
     @app.get("/api/install/pfsense/{token}/package")

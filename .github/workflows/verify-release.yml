@@ -26,13 +26,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
         run: |
-          gh release download v0.7.1 --repo "$REPOSITORY" --pattern o3-cloud-central-0.7.1.tar.gz --dir /tmp
+          gh release download v0.7.2 --repo "$REPOSITORY" --pattern o3-cloud-central-0.7.2.tar.gz --dir /tmp
           mkdir /tmp/current-release
-          tar -xzf /tmp/o3-cloud-central-0.7.1.tar.gz -C /tmp/current-release
+          tar -xzf /tmp/o3-cloud-central-0.7.2.tar.gz -C /tmp/current-release
       - name: Migrate and verify all retained state
         run: |
-          sudo python3 /tmp/current-release/o3-cloud-central-0.7.1/deploy/migrate-central.py --plan
-          sudo python3 /tmp/current-release/o3-cloud-central-0.7.1/deploy/migrate-central.py
+          sudo python3 /tmp/current-release/o3-cloud-central-0.7.2/deploy/migrate-central.py --plan
+          sudo python3 /tmp/current-release/o3-cloud-central-0.7.2/deploy/migrate-central.py
           sudo env GITHUB_ACTIONS=true /opt/o3cloudcentral/venv/bin/python source/scripts/verify-migration.py after
       - name: Diagnostics
         if: failure()

@@ -23,8 +23,8 @@ Se a VM não puder baixar a release diretamente, transfira o arquivo da release 
 
 ```bash
 sha256sum --check SHA256SUMS --ignore-missing
-tar -xzf o3-cloud-central-0.7.1.tar.gz
-cd o3-cloud-central-0.7.1
+tar -xzf o3-cloud-central-0.7.2.tar.gz
+cd o3-cloud-central-0.7.2
 sudo python3 deploy/install-central.py --url https://10.20.0.10:8443
 ```
 

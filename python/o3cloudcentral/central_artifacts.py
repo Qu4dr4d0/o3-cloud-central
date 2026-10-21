@@ -15,7 +15,8 @@ from typing import Any, Iterator
 
 INSTALLER_MAGIC = b"O3CC001!"
 MAX_ARTIFACT = 128 << 20
-DEFAULT_PFSENSE_PACKAGE = "pfSense-pkg-O3CloudCentral-0.7.0.pkg"
+DEFAULT_PFSENSE_PACKAGE = "pfSense-pkg-O3CloudCentral-0.7.2.pkg"
+PFSENSE_PLATFORM = "pfSense CE 2.7.x / 2.8.x / 2.9.x amd64"
 
 # Only these application-owned paths are snapshotted/removed by update recovery.
 # Configuration is backed up separately. The live policy cache is never removed
@@ -178,7 +179,7 @@ def pfsense_command(bundle: dict[str, Any], checksum: str, *, update: bool = Fal
     steps = [
         "set -eu",
         '[ "$(id -u)" -eq 0 ] || { echo "Execute como root no pfSense." >&2; exit 1; }',
-        'case "$(uname -s):$(uname -m):$(uname -r)" in FreeBSD:amd64:14.*) ;; *) echo "Este pacote requer FreeBSD 14 amd64." >&2; exit 1 ;; esac',
+        'case "$(uname -s):$(uname -m):$(uname -r)" in FreeBSD:amd64:14.*|FreeBSD:amd64:15.*|FreeBSD:amd64:16.*) ;; *) echo "Requer pfSense CE 2.7.x, 2.8.x ou 2.9.x amd64 (FreeBSD 14, 15 ou 16)." >&2; exit 1 ;; esac',
         "umask 077",
         "export O3C_PRESERVE_STATE=1",
     ]

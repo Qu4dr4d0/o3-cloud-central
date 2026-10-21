@@ -38,7 +38,7 @@ def test_reinstall_command_is_fresh_guarded_and_preserves_live_gateway(lab):
     before = repository.read()
     result, bundle = reinstall(client, site)
     assert set(result) == {"command", "expires_at", "sha256", "platform"}
-    assert result["platform"] == "FreeBSD 14 amd64" and result["sha256"] in result["command"]
+    assert result["platform"] == "pfSense CE 2.7.x / 2.8.x / 2.9.x amd64" and result["sha256"] in result["command"]
     assert '[ ! -e /usr/local/etc/o3cloudcentral/config.json ]' in result["command"]
     assert '--replace-client ' + site['id'] in result['command']
     assert 'tar -xOf "$edge_tmp/package.pkg" /usr/local/sbin/o3cloudcentral-uninstall' in result['command']

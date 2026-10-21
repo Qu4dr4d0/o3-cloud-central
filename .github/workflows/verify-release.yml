@@ -26,13 +26,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
         run: |
-          gh release download v0.7.0 --repo "$REPOSITORY" --pattern o3-cloud-central-0.7.0.tar.gz --dir /tmp
+          gh release download v0.7.1 --repo "$REPOSITORY" --pattern o3-cloud-central-0.7.1.tar.gz --dir /tmp
           mkdir /tmp/current-release
-          tar -xzf /tmp/o3-cloud-central-0.7.0.tar.gz -C /tmp/current-release
+          tar -xzf /tmp/o3-cloud-central-0.7.1.tar.gz -C /tmp/current-release
       - name: Migrate and verify all retained state
         run: |
-          sudo python3 /tmp/current-release/o3-cloud-central-0.7.0/deploy/migrate-central.py --plan
-          sudo python3 /tmp/current-release/o3-cloud-central-0.7.0/deploy/migrate-central.py
+          sudo python3 /tmp/current-release/o3-cloud-central-0.7.1/deploy/migrate-central.py --plan
+          sudo python3 /tmp/current-release/o3-cloud-central-0.7.1/deploy/migrate-central.py
           sudo env GITHUB_ACTIONS=true /opt/o3cloudcentral/venv/bin/python source/scripts/verify-migration.py after
       - name: Diagnostics
         if: failure()
@@ -46,8 +46,20 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           REF: ${{ github.ref_name }}
         run: git clone --depth 1 --branch "$REF" "https://github.com/$REPOSITORY.git" source
+      - name: Create a matching human login before installation
+        run: |
+          sudo useradd --create-home --shell /bin/bash o3cloudcentral
+          getent passwd o3cloudcentral > /tmp/o3-human-before.txt
       - name: Install the release on a fresh Ubuntu runner
-        run: sudo sh source/install.sh --url https://central.example.com:8443
+        run: sudo sh -c 'umask 077; exec sh "$@"' sh source/install.sh --url https://central.example.com:8443
+      - name: Verify service isolation and preserve human login
+        run: |
+          getent passwd o3cloudcentral > /tmp/o3-human-after.txt
+          diff /tmp/o3-human-before.txt /tmp/o3-human-after.txt
+          test "$(systemctl show -p User --value o3cloudcentral)" = _o3cloudcentral
+          test "$(getent passwd _o3cloudcentral | cut -d: -f7)" = /usr/sbin/nologin
+          test "$(sudo mariadb --batch --skip-column-names -e "SELECT COUNT(*) FROM mysql.user WHERE User='o3cloudcentral';")" = 0
+          sudo runuser -u o3cloudcentral -- sh -c 'test ! -r /var/lib/o3cloudcentral/ca.key'
       - name: Verify bootstrap credentials and mandatory change
         run: sudo /opt/o3cloudcentral/venv/bin/python source/scripts/verify-installed.py
       - name: Install again and preserve the password

@@ -2,6 +2,7 @@
 """Install the central on a dedicated Ubuntu VM; never replace unknown state."""
 from __future__ import annotations
 import argparse
+import grp
 import hashlib
 import json
 import os
@@ -20,7 +21,42 @@ ROOT = Path(__file__).resolve().parents[1]
 BASE = Path("/opt/o3cloudcentral")
 DATA = Path("/var/lib/o3cloudcentral")
 MARKER = Path("/etc/o3cloudcentral-install.json")
-DSN = "mysql+pymysql://o3cloudcentral@localhost/o3cloudcentral?unix_socket=/run/mysqld/mysqld.sock"
+SERVICE_USER = "_o3cloudcentral"
+LEGACY_SERVICE_USER = "o3cloudcentral"
+UNIT = Path("/etc/systemd/system/o3cloudcentral.service")
+
+def select_service_user(previous):
+    """Fresh installs use a separate system identity; upgrades retain ownership."""
+    name = SERVICE_USER
+    if previous:
+        name = previous.get("service_user")
+        if name is None:
+            # The original installer did not record the service account.
+            unit = UNIT.read_text() if UNIT.exists() else ""
+            match = re.search(r"^User=([a-z_][a-z0-9_-]*)$", unit, re.M)
+            name = match[1] if match else LEGACY_SERVICE_USER
+        if name not in (SERVICE_USER, LEGACY_SERVICE_USER):
+            raise ValueError("Conta de serviço desconhecida; nenhuma conta será reutilizada.")
+    try:
+        account = pwd.getpwnam(name)
+    except KeyError:
+        if previous and previous.get("ready"):
+            raise ValueError("A conta da instalação existente não foi encontrada.")
+        try:
+            grp.getgrnam(name)
+        except KeyError:
+            return name
+        raise ValueError("O grupo reservado ao serviço já existe e não pertence a esta instalação.")
+    if not previous:
+        raise ValueError("A conta reservada " + name + " já existe; nenhuma conta será reutilizada.")
+    if (account.pw_uid == 0 or account.pw_uid >= 1000
+            or account.pw_shell not in ("/usr/sbin/nologin", "/sbin/nologin", "/bin/false")
+            or account.pw_dir != str(DATA) or grp.getgrgid(account.pw_gid).gr_name != name):
+        raise ValueError("A conta existente não é uma conta de sistema exclusiva da central; dados e login preservados.")
+    return name
+
+def database_url(service_user):
+    return "mysql+pymysql://" + service_user + "@localhost/o3cloudcentral?unix_socket=/run/mysqld/mysqld.sock"
 
 def run(args, **kw):
     return subprocess.run(args, check=True, **kw)
@@ -64,6 +100,10 @@ def main():
     url, host, port = origin(args.url)
     if os.geteuid() != 0:
         parser.error("Execute com sudo.")
+    # Public code/runtime must be traversable by the service even when the
+    # administrator uses umask 077. State, keys and configuration retain their
+    # explicit private modes (0700/0600/0640).
+    os.umask(0o022)
     system = platform.freedesktop_os_release()
     if system.get("ID") != "ubuntu" or system.get("VERSION_ID") not in ("24.04", "26.04") or platform.machine() != "x86_64":
         parser.error("Requer Ubuntu 24.04 ou 26.04 amd64.")
@@ -85,42 +125,48 @@ def main():
     else:
         if BASE.exists() or DATA.exists() or Path("/etc/o3cloudcentral.env").exists():
             raise ValueError("Instalação existente sem identificação deste instalador; nada foi alterado.")
-        try:
-            pwd.getpwnam("o3cloudcentral")
-        except KeyError:
-            pass
-        else:
-            raise ValueError("Usuário o3cloudcentral já existe; não será reutilizado automaticamente.")
+    service_user = select_service_user(previous)
+    dsn = database_url(service_user)
     environment = dict(os.environ, DEBIAN_FRONTEND="noninteractive")
     run(["apt-get", "update"], env=environment)
     run(["apt-get", "install", "-y", "python3", "python3-venv", "mariadb-server", "ca-certificates", "curl"], env=environment)
     run(["service", "mariadb", "start"] if args.prepare_only else ["systemctl", "enable", "--now", "mariadb"])
     if previous is None:
         exists = sql("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='o3cloudcentral';")
-        account = sql("SELECT User FROM mysql.user WHERE User='o3cloudcentral';")
+        account = sql("SELECT User FROM mysql.user WHERE User='" + service_user + "';")
         if exists or account:
             raise ValueError("Banco ou usuário SQL o3cloudcentral existente. Instalação cancelada para preservar os dados.")
-        previous = {"product": "o3-cloud-central", "url": url, "ready": False, "database_ready": False}
+        previous = {"product": "o3-cloud-central", "url": url, "ready": False, "database_ready": False,
+                    "service_user": service_user}
         write(MARKER, json.dumps(previous))
     try:
-        pwd.getpwnam("o3cloudcentral")
+        pwd.getpwnam(service_user)
     except KeyError:
-        run(["useradd", "--system", "--home-dir", str(DATA), "--shell", "/usr/sbin/nologin", "o3cloudcentral"])
-    account = pwd.getpwnam("o3cloudcentral")
+        run(["useradd", "--system", "--home-dir", str(DATA), "--shell", "/usr/sbin/nologin", service_user])
+    account = pwd.getpwnam(service_user)
     DATA.mkdir(mode=0o700, exist_ok=True)
     os.chown(DATA, account.pw_uid, account.pw_gid)
     os.chmod(DATA, 0o700)
     if not previous.get("database_ready"):
         # Only a marked partial installation reaches this branch. No DROP or reset.
         sql("CREATE DATABASE IF NOT EXISTS o3cloudcentral CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;"
-            "CREATE USER IF NOT EXISTS 'o3cloudcentral'@'localhost' IDENTIFIED VIA unix_socket;"
-            "GRANT ALL PRIVILEGES ON o3cloudcentral.* TO 'o3cloudcentral'@'localhost';")
+            "CREATE USER IF NOT EXISTS '" + service_user + "'@'localhost' IDENTIFIED VIA unix_socket;"
+            "GRANT ALL PRIVILEGES ON o3cloudcentral.* TO '" + service_user + "'@'localhost';")
         previous["database_ready"] = True
         write(MARKER, json.dumps(previous))
     release_id = manifest["version"] + "-" + str(time.time_ns())
+    for folder in (BASE, BASE / "releases", BASE / "venvs"):
+        if folder.is_symlink():
+            raise ValueError("Diretório de código redirecionado; instalação cancelada.")
+        folder.mkdir(mode=0o755, parents=True, exist_ok=True)
+        if folder.stat().st_uid != 0:
+            raise ValueError("O diretório de código não pertence ao root.")
+        folder.chmod(0o755)
     release = BASE / "releases" / release_id
     release.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(ROOT, release, ignore=shutil.ignore_patterns(".git", "__pycache__", ".pytest_cache", ".venv"))
+    # copytree also copies the source directory's mode (possibly 0700).
+    release.chmod(0o755)
     for item in release.rglob("*"):
         if item.is_symlink():
             raise ValueError("Links simbólicos não são permitidos na distribuição.")
@@ -135,12 +181,12 @@ def main():
     run([python, "-m", "pip", "install", "--require-hashes", "--only-binary=:all:", "--no-deps",
          "-r", str(release / "requirements-central.lock")], env=pip_env)
     run([python, "-m", "pip", "check"], env=pip_env)
-    child_env = dict(pip_env, PYTHONPATH=str(release / "python"), O3CLOUDCENTRAL_DATABASE_URL=DSN)
+    child_env = dict(pip_env, PYTHONPATH=str(release / "python"), O3CLOUDCENTRAL_DATABASE_URL=dsn)
     if not previous.get("ready"):
         # Do not overwrite PKI left by an interrupted initialization.
         if (DATA / "ca.key").exists():
             raise ValueError("Inicialização interrompida deixou PKI. Dados preservados; consulte deploy/INSTALL.md antes de continuar.")
-        run(["runuser", "-u", "o3cloudcentral", "--", python, "-B", "-m", "o3cloudcentral", "init-central",
+        run(["runuser", "-u", service_user, "--", python, "-B", "-m", "o3cloudcentral", "init-central",
              "--dir", str(DATA), "--url", url, "--names", host + ",localhost,127.0.0.1"], env=child_env)
         previous["ready"] = True
         write(MARKER, json.dumps(previous))
@@ -159,9 +205,10 @@ def main():
     old_unit = unit_path.read_text() if unit_path.exists() else None
     link(BASE / "current", release)
     link(BASE / "venv", venv)
-    write(env_path, "PYTHONPATH=/opt/o3cloudcentral/current/python\nO3CLOUDCENTRAL_RESOURCE_ROOT=/opt/o3cloudcentral/current\nO3CLOUDCENTRAL_DATABASE_URL=" + DSN + "\n", 0o640)
+    write(env_path, "PYTHONPATH=/opt/o3cloudcentral/current/python\nO3CLOUDCENTRAL_RESOURCE_ROOT=/opt/o3cloudcentral/current\nO3CLOUDCENTRAL_DATABASE_URL=" + dsn + "\n", 0o640)
     os.chown(env_path, 0, account.pw_gid)
     unit = (release / "deploy/o3cloudcentral.service").read_text().replace("--listen :8443", "--listen :" + str(port))
+    unit = unit.replace("User=_o3cloudcentral", "User=" + service_user).replace("Group=_o3cloudcentral", "Group=" + service_user)
     write(unit_path, unit, 0o644)
     ca_dir = Path("/etc/o3cloudcentral")
     ca_dir.mkdir(mode=0o755, exist_ok=True)
@@ -190,7 +237,7 @@ def main():
                 run(["systemctl", "daemon-reload"])
                 run(["systemctl", "restart", "o3cloudcentral"])
             raise
-    previous.update(version=manifest["version"], release=str(release))
+    previous.update(version=manifest["version"], release=str(release), service_user=service_user)
     write(MARKER, json.dumps(previous))
     print("\nCentral preparada." if args.prepare_only else "\nCentral instalada e verificada por HTTPS.")
     print("Painel: " + url + "\nPrimeiro acesso: usuário admin / senha admin. A troca de senha é obrigatória.")

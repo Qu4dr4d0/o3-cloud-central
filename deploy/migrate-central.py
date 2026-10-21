@@ -178,7 +178,7 @@ def main():
         write(ENV, "PYTHONPATH=/opt/o3cloudcentral/current/python\nO3CLOUDCENTRAL_RESOURCE_ROOT=/opt/o3cloudcentral/current\n"
               "O3CLOUDCENTRAL_DATABASE_URL=mysql+pymysql://o3cloudcentral@localhost/o3cloudcentral?unix_socket=/run/mysqld/mysqld.sock\n",0o640)
         os.chown(ENV,0,account.pw_gid)
-        write(MARKER,json.dumps({"product":"o3-cloud-central","url":url,"ready":True,"database_ready":True}))
+        write(MARKER,json.dumps({"product":"o3-cloud-central","url":url,"ready":True,"database_ready":True,"service_user":TARGET}))
         journal["phase"]="copied"; write(JOURNAL,json.dumps(journal,indent=2))
         command = [sys.executable,str(ROOT/"deploy/install-central.py"),"--url",url,"--upgrade"]
         if args.prepare_only: command.append("--prepare-only")

@@ -23,8 +23,8 @@ Se a VM não puder baixar a release diretamente, transfira o arquivo da release 
 
 ```bash
 sha256sum --check SHA256SUMS --ignore-missing
-tar -xzf o3-cloud-central-0.7.0.tar.gz
-cd o3-cloud-central-0.7.0
+tar -xzf o3-cloud-central-0.7.1.tar.gz
+cd o3-cloud-central-0.7.1
 sudo python3 deploy/install-central.py --url https://10.20.0.10:8443
 ```
 
@@ -45,3 +45,7 @@ Se a atualização de uma central existente falhar no teste HTTPS, o instalador 
 Mantenha o DNS/IP da URL estável e alcançável pelos pfSenses. Alterar a URL ou migrar a central para uma instalação prévia de laboratório exige um procedimento específico; o instalador não adota bancos desconhecidos nem troca a CA automaticamente.
 
 A porta padrão é HTTPS 8443, tanto para o painel quanto para a API autenticada dos firewalls. Não existe SSH entre o painel e os agentes. O banco não precisa de nenhuma publicação de porta.
+
+## Conta de serviço
+
+Novas instalações usam `_o3cloudcentral` como usuário do Linux e do MariaDB, com autenticação por socket Unix. Uma conta de login chamada `o3cloudcentral` pode existir na VM e é preservada. O banco e os caminhos de dados continuam `o3cloudcentral`. Atualizações de instalações anteriores preservam a conta de serviço já identificada, desde que seja uma conta de sistema sem login.

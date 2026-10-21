@@ -5,8 +5,8 @@ Wants=network-online.target
 Requires=mariadb.service
 
 [Service]
-User=o3cloudcentral
-Group=o3cloudcentral
+User=_o3cloudcentral
+Group=_o3cloudcentral
 WorkingDirectory=/var/lib/o3cloudcentral
 EnvironmentFile=/etc/o3cloudcentral.env
 ExecStart=/opt/o3cloudcentral/venv/bin/python -B -m o3cloudcentral central --dir /var/lib/o3cloudcentral --listen :8443 --internal-only=false

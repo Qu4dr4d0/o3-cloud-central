@@ -36,10 +36,12 @@ Baixe o instalador e execute, substituindo a URL:
 
 ```bash
 curl --fail --location --proto '=https' --proto-redir '=https' \
-  https://raw.githubusercontent.com/Qu4dr4d0/o3-cloud-central/v0.7.0/install.sh \
+  https://raw.githubusercontent.com/Qu4dr4d0/o3-cloud-central/v0.7.1/install.sh \
   -o /tmp/o3cloudcentral-install.sh
 sudo sh /tmp/o3cloudcentral-install.sh --url https://10.20.0.10:8443
 ```
+
+Novas instalações usam a conta de sistema `_o3cloudcentral`, sem login, separada da conta usada para acessar a VM por SSH. O nome do banco continua `o3cloudcentral`.
 
 O instalador confere o SHA-256 da distribuição, instala MariaDB e o ambiente Python com dependências fixadas, cria um usuário de serviço, gera certificados exclusivos e inicia a central com systemd. Os agentes genéricos Windows, Linux e pfSense já vêm incluídos. Não é necessário compilar na VM.
 
